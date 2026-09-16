@@ -27,7 +27,7 @@ from ..capture.types import Frame
 from ..engine import GestureEngine
 from ..gestures import GestureThresholds, default_gestures
 from ..mapping import Mapper, load_document
-from ..output import MacPerformer
+from ..output import MacPerformer, accessibility_trusted
 from .config import Config, ensure_mappings
 
 log = logging.getLogger(__name__)
@@ -66,6 +66,9 @@ class Runtime:
         self.camera_ok = camera_authorized()
         if not self.camera_ok:
             self.on_status("camera permission denied")
+        if not accessibility_trusted():
+            log.warning("Accessibility not granted: key and scroll events will be dropped")
+            self.on_status("no Accessibility grant: keys dropped")
         self._thread.start()
 
     def stop(self) -> None:

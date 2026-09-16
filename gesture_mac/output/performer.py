@@ -9,6 +9,8 @@ Accessibility permission, or events are silently dropped.
 """
 from __future__ import annotations
 
+import ctypes
+
 import time
 
 import Quartz as Q
@@ -76,3 +78,14 @@ class MacPerformer:
         # Pixel units so fractional per-frame steps still move something.
         ev = Q.CGEventCreateScrollWheelEvent(self._src, Q.kCGScrollEventUnitPixel, 2, int(round(dy)), int(round(dx)))
         Q.CGEventPost(Q.kCGHIDEventTap, ev)
+
+
+def accessibility_trusted() -> bool:
+    """Whether macOS will deliver the events this performer posts. Without
+    the Accessibility grant they are silently dropped, which looks exactly
+    like a binding that does nothing. Re-signing the bundle (a rebuild
+    that changes Info.plist or the launcher) changes its code hash and
+    invalidates the grant, so the app checks at start and says so."""
+    lib = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")
+    lib.AXIsProcessTrusted.restype = ctypes.c_bool
+    return bool(lib.AXIsProcessTrusted())

@@ -138,8 +138,12 @@ AVFoundation enumerate in the same order).
   Google's CDN if missing).
 - The process posting events needs Accessibility permission: System
   Settings > Privacy & Security > Accessibility, add the terminal the app
-  was launched from (or the .app once packaged). Without it, events are
-  silently dropped.
+  was launched from (or the .app). Without it, events are silently
+  dropped; the status line says "no Accessibility grant: keys dropped" at
+  start. Re-running make-app.sh in a way that changes Info.plist or the
+  launcher re-seals the bundle with a new code hash, and macOS then
+  treats it as a different app: the grant must be removed and re-added
+  (observed 2026-09-15 after the icon was added).
 - MediaPipe handedness assumes a selfie-view source. `flip_handedness` in
   config exists for a non-selfie camera.
 - Synthesized right-option (flagsChanged with the right-side device bit)
