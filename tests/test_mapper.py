@@ -1,11 +1,12 @@
 """Hold-key bindings follow the pinch's lifetime (or start at the held
-phase with trigger "hold"); disabling releases held keys; press-key fires
-once on its trigger."""
+phase with trigger "hold"); disabling releases held keys; press-key and
+click fire once on their trigger; a modifier gates a binding."""
 from gesture_mac.engine import GestureEngine
 from gesture_mac.gestures.builtin.pinches import IndexPinch
 from gesture_mac.gestures.builtin.poses import Fist
 from gesture_mac.mapping import Mapper, MappingDocument, parse_action
-from gesture_mac.mapping.bindings import Binding, Control, document_to_json, parse_document
+from gesture_mac.mapping.actions import action_to_json
+from gesture_mac.mapping.bindings import Binding, Control, While, document_to_json, parse_document
 
 from .synth import frame, hand
 
@@ -25,6 +26,9 @@ class Recorder:
 
     def scroll(self, dx, dy):
         self.log.append(("scroll", round(dx, 3), round(dy, 3)))
+
+    def click(self, button, count):
+        self.log.append(("click", button, count))
 
 
 def doc_with_hold(hand_sel="right"):
@@ -100,6 +104,70 @@ def test_press_key_fires_once_on_trigger():
     for t in range(0, 700, 10):
         engine.update(frame(t, [fist]))
     assert rec.log == [("press", "cmd+shift+4")]
+
+
+def doc_with_click(trigger="engage", while_=None):
+    return MappingDocument(
+        controls=[Control("clk", "Click", "action", parse_action({"type": "click", "button": "left", "count": 1}))],
+        bindings=[Binding("b1", "index-pinch", "right", "clk", trigger=trigger, while_=while_)],
+    )
+
+
+def test_click_fires_once_per_pinch():
+    engine = GestureEngine([IndexPinch()])
+    rec = Recorder()
+    Mapper(engine, doc_with_click(), rec)
+    pinch_cycle(engine)
+    assert rec.log == [("click", "left", 1)]
+    pinch_cycle(engine, 500)
+    assert rec.log == [("click", "left", 1), ("click", "left", 1)]
+
+
+def test_held_pinch_does_not_repeat_the_click():
+    engine = GestureEngine([IndexPinch()])
+    rec = Recorder()
+    Mapper(engine, doc_with_click(), rec)
+    for t in range(0, 2000, 10):
+        engine.update(frame(t, [hand(0.05)]))
+    engine.update(frame(2010, [hand(1.0)]))
+    assert rec.log == [("click", "left", 1)]
+
+
+def test_click_on_release_trigger_waits_for_release():
+    engine = GestureEngine([IndexPinch()])
+    rec = Recorder()
+    Mapper(engine, doc_with_click(trigger="release"), rec)
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [hand(0.05)]))
+    assert rec.log == []
+    engine.update(frame(110, [hand(1.0)]))
+    assert rec.log == [("click", "left", 1)]
+
+
+def test_click_with_modifier_needs_the_other_hand():
+    engine = GestureEngine([IndexPinch(), Fist()])
+    rec = Recorder()
+    Mapper(engine, doc_with_click(while_=While("fist", "left")), rec)
+    pinch_cycle(engine)
+    assert rec.log == []
+    fist = hand(1.0, handedness="left")
+    fist.pose_label, fist.pose_score = "Closed_Fist", 0.95
+    for t in range(500, 600, 10):
+        engine.update(frame(t, [fist]))
+    for t in range(600, 700, 10):
+        engine.update(frame(t, [fist, hand(0.05)]))
+    assert rec.log == [("click", "left", 1)]
+
+
+def test_click_action_round_trips_and_rejects_bad_values():
+    import pytest
+
+    assert action_to_json(parse_action({"type": "click"})) == {"type": "click", "button": "left", "count": 1}
+    assert parse_action({"type": "click", "button": "middle", "count": 2}).count == 2
+    with pytest.raises(ValueError):
+        parse_action({"type": "click", "button": "back"})
+    with pytest.raises(ValueError):
+        parse_action({"type": "click", "count": 3})
 
 
 def test_document_round_trips():

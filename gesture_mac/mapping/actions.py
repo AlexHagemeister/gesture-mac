@@ -6,6 +6,7 @@ JSON shape (the "action" field of a control of kind "action"):
     {"type": "hold-key",  "key": "right-option"}
     {"type": "press-key", "key": "cmd+shift+4"}
     {"type": "scroll",    "axis": "y", "sensitivity": 40}
+    {"type": "click",     "button": "left", "count": 1}
 
 Key names: a chord of "+"-joined tokens. Modifiers: cmd, shift, option/alt,
 ctrl, fn, and the sided forms right-option, left-cmd, etc. Base keys: a
@@ -48,7 +49,18 @@ class Scroll:
     type: Literal["scroll"] = "scroll"
 
 
-Action = Union[HoldKey, PressKey, Scroll]
+@dataclass(frozen=True, slots=True)
+class Click:
+    """Mouse click at the cursor's current position, once, on the binding's
+    trigger. count 2 is a double-click. Moving the cursor is the pointer
+    slices' job (issues #8 to #10); this only proves the mouse-event path."""
+
+    button: Literal["left", "right", "middle"] = "left"
+    count: int = 1
+    type: Literal["click"] = "click"
+
+
+Action = Union[HoldKey, PressKey, Scroll, Click]
 
 
 def parse_action(d: dict) -> Action:
@@ -63,10 +75,20 @@ def parse_action(d: dict) -> Action:
             sensitivity=float(d.get("sensitivity", 40.0)),
             invert=bool(d.get("invert", False)),
         )
+    if kind == "click":
+        button = d.get("button", "left")
+        if button not in ("left", "right", "middle"):
+            raise ValueError(f"unknown mouse button: {button!r}")
+        count = int(d.get("count", 1))
+        if count not in (1, 2):
+            raise ValueError(f"click count must be 1 or 2, not {count}")
+        return Click(button=button, count=count)
     raise ValueError(f"unknown action type: {kind!r}")
 
 
 def action_to_json(a: Action) -> dict:
     if isinstance(a, (HoldKey, PressKey)):
         return {"type": a.type, "key": a.key}
+    if isinstance(a, Click):
+        return {"type": a.type, "button": a.button, "count": a.count}
     return {"type": a.type, "axis": a.axis, "sensitivity": a.sensitivity, "invert": a.invert}

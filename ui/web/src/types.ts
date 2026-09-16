@@ -8,11 +8,13 @@ export type HandSelector = HandKey | "either";
 export type Trigger = "engage" | "hold" | "release" | "flick-left" | "flick-right" | "flick-up" | "flick-down";
 export type Phase = "engage" | "hold" | "release" | "flick";
 export type ScrollAxis = "x" | "y";
+export type MouseButton = "left" | "right" | "middle";
 
 export type Action =
   | { type: "hold-key"; key: string }
   | { type: "press-key"; key: string }
-  | { type: "scroll"; axis: ScrollAxis; sensitivity: number; invert: boolean };
+  | { type: "scroll"; axis: ScrollAxis; sensitivity: number; invert: boolean }
+  | { type: "click"; button: MouseButton; count: 1 | 2 };
 export type ActionType = Action["type"];
 
 export interface Control {
