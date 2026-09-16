@@ -15,6 +15,9 @@ SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "gesture-mac"
 CONFIG_PATH = SUPPORT_DIR / "config.json"
 MAPPINGS_PATH = SUPPORT_DIR / "mappings.json"
 DEFAULT_PRESET = Path(__file__).resolve().parents[2] / "presets" / "default.json"
+DEFAULT_FPS = 30.0
+OLD_DEFAULT_FPS = 15.0
+"""The active-rate default before issue #6; read as DEFAULT_FPS when found on disk."""
 
 
 @dataclass(slots=True)
@@ -23,8 +26,9 @@ class Config:
     """The master switch: off releases the camera and performs nothing."""
     camera: str | None = None
     """Camera name as AVFoundation reports it; None = built-in."""
-    fps: float = 15.0
-    """Tracking rate while a hand is in view."""
+    fps: float = DEFAULT_FPS
+    """Ceiling on the tracking rate while a hand is in view. The camera's
+    own rate is the other ceiling; the built-in camera delivers 30."""
     idle_fps: float = 4.0
     """Tracking rate after idle_after_s with no hand in view."""
     idle_after_s: float = 3.0
@@ -38,6 +42,10 @@ def load_config() -> Config:
     if CONFIG_PATH.exists():
         raw = json.loads(CONFIG_PATH.read_text())
         known = {k: v for k, v in raw.items() if k in Config.__dataclass_fields__}
+        if known.get("fps") == OLD_DEFAULT_FPS:
+            # A file written by an earlier version carries the old default,
+            # never a choice; read it as the current default (issue #6).
+            known["fps"] = DEFAULT_FPS
         return Config(**known)
     return Config()
 

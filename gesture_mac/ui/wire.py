@@ -199,4 +199,8 @@ class Publisher:
                 bgr = self.rt.last_bgr
                 image = encode_jpeg(bgr) if bgr is not None else None
                 await self.broadcast(frame_json(self.rt, frame, image))
-            await asyncio.sleep(1.0 / max(self.rt.cfg.fps, 1.0))
+            # Poll at twice the frame rate: polling at the frame period beat
+            # against the frames and dropped one in five, so the page's fps
+            # read 25 against 30 tracked (Alex, 2026-09-16). Dedup by frame.t
+            # above keeps the faster poll from sending anything twice.
+            await asyncio.sleep(0.5 / max(self.rt.cfg.fps, 1.0))
