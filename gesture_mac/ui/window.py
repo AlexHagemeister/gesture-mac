@@ -19,7 +19,7 @@ from AppKit import (
     NSWindowStyleMaskResizable,
     NSWindowStyleMaskTitled,
 )
-from Foundation import NSURL, NSURLRequest
+from Foundation import NSURL, NSURLRequest, NSURLRequestReloadIgnoringLocalCacheData
 from WebKit import WKWebView, WKWebViewConfiguration
 
 BLANK = NSURLRequest.requestWithURL_(NSURL.URLWithString_("about:blank"))
@@ -49,7 +49,12 @@ class HudWindow:
         if self._window is None:
             self._build()
         assert self._window is not None and self._view is not None
-        self._view.loadRequest_(NSURLRequest.requestWithURL_(NSURL.URLWithString_(url)))
+        # Ignore the cache: after a relaunch with a rebuilt page, WebKit
+        # otherwise kept showing the old one (Alex, 2026-09-16).
+        req = NSURLRequest.requestWithURL_cachePolicy_timeoutInterval_(
+            NSURL.URLWithString_(url), NSURLRequestReloadIgnoringLocalCacheData, 30.0
+        )
+        self._view.loadRequest_(req)
         # A bare python process (uv run, not the bundle with LSUIElement)
         # starts with the Prohibited policy, so macOS never activates it:
         # the window took clicks but keystrokes went to the previous app
