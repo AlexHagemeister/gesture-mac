@@ -66,7 +66,7 @@ class Runtime:
         self.camera_ok = camera_authorized()
         if not self.camera_ok:
             self.on_status("camera permission denied")
-        if not accessibility_trusted():
+        if not accessibility_trusted(prompt=True):
             log.warning("Accessibility not granted: key and scroll events will be dropped")
             self.on_status("no Accessibility grant: keys dropped")
         self._thread.start()

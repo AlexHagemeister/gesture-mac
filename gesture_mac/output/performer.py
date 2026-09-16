@@ -80,12 +80,20 @@ class MacPerformer:
         Q.CGEventPost(Q.kCGHIDEventTap, ev)
 
 
-def accessibility_trusted() -> bool:
+def accessibility_trusted(prompt: bool = False) -> bool:
     """Whether macOS will deliver the events this performer posts. Without
     the Accessibility grant they are silently dropped, which looks exactly
-    like a binding that does nothing. Re-signing the bundle (a rebuild
-    that changes Info.plist or the launcher) changes its code hash and
-    invalidates the grant, so the app checks at start and says so."""
+    like a binding that does nothing. With prompt=True, macOS shows its
+    "would like to control this Mac" dialog when the grant is missing
+    (the dialog only ever appears on request; posting events never
+    triggers it). Re-signing the bundle (a rebuild that changes Info.plist
+    or the launcher) changes its code hash and invalidates the grant, so
+    the app asks at start and says so."""
+    import objc
+    from Foundation import NSDictionary
+
     lib = ctypes.cdll.LoadLibrary("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices")
-    lib.AXIsProcessTrusted.restype = ctypes.c_bool
-    return bool(lib.AXIsProcessTrusted())
+    lib.AXIsProcessTrustedWithOptions.argtypes = [ctypes.c_void_p]
+    lib.AXIsProcessTrustedWithOptions.restype = ctypes.c_bool
+    opts = NSDictionary.dictionaryWithObject_forKey_(bool(prompt), "AXTrustedCheckOptionPrompt")
+    return bool(lib.AXIsProcessTrustedWithOptions(objc.pyobjc_id(opts)))
