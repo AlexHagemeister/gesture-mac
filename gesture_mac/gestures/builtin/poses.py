@@ -1,12 +1,14 @@
 """Static hand poses. These lean on the GestureRecognizer model's built-in
 classifier (its score is already 0..1) and add a geometric sanity check
-where the classifier is known to be loose. Momentary only.
+where the classifier is known to be loose. Momentary, except Point,
+which is continuous and anchored at the index fingertip so a pointing
+hand reports where the finger aims (the pointer slices, issue #8).
 """
 from __future__ import annotations
 
 from ...capture.types import LM, Hand
-from ..base import Gesture
-from ..geometry import finger_extended, thumb_extended
+from ..base import ContinuousGesture, Gesture
+from ..geometry import Pose, finger_extended, hand_pose, thumb_extended
 
 
 def pose_score(hand: Hand, label: str) -> float:
@@ -32,10 +34,10 @@ class Fist(Gesture[Hand]):
         return pose_score(hand, "Closed_Fist")
 
 
-class Point(Gesture[Hand]):
+class Point(ContinuousGesture[Hand]):
     id = "point"
     label = "Point"
-    hint = "Index finger up, others curled."
+    hint = "Index finger up, others curled. While held, the fingertip's position drives axes."
 
     def score(self, hand: Hand) -> float:
         # Classifier label is Pointing_Up; the geometric check keeps it honest
@@ -50,6 +52,9 @@ class Point(Gesture[Hand]):
             else 0.0
         )
         return max(from_model, geometric)
+
+    def anchor(self, hand: Hand) -> Pose:
+        return hand_pose(hand, hand.landmarks[LM.INDEX_TIP])
 
 
 class ThumbsUp(Gesture[Hand]):

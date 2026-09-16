@@ -94,8 +94,10 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 - **Bindings serialize.** New binding fields get a default and a JSON key
   matching the template's camelCase. The document version stays 2 unless an
   old file would misbehave.
-- **Keep the engine a faithful port.** If a behavior changes here, change it
-  in the template too, or note the divergence in both CLAUDE.md files.
+- **The template is a starting point, not a twin.** gesture-template's
+  engine and this one may differ freely (Alex, 2026-09-16, when Point
+  became continuous here only). Port a fix across when it helps; never
+  hold a change here to keep the two identical.
 - **Comments say why, docstrings say what.** Every module opens with a
   docstring naming what it owns. No commentary inside functions unless the
   line would puzzle a reader.
