@@ -54,6 +54,15 @@ def resolve_camera(name: str | None, cameras: list[CameraInfo]) -> CameraInfo | 
     return cameras[0] if cameras else None
 
 
+def camera_status_authorized() -> bool:
+    """The current grant, no prompt. Safe from any thread; the capture loop
+    polls it while denied so a grant made in System Settings takes effect
+    without a relaunch."""
+    import AVFoundation as AV
+
+    return AV.AVCaptureDevice.authorizationStatusForMediaType_(AV.AVMediaTypeVideo) == AV.AVAuthorizationStatusAuthorized
+
+
 def camera_authorized(timeout_s: float = 60.0) -> bool:
     """Ask macOS for camera access if not yet decided. Must run on the main
     thread (the prompt spins the main run loop). OpenCV's own request cannot

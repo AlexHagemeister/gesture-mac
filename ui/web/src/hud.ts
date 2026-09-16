@@ -5,10 +5,12 @@
  * so you can see the filter working). Ported from gesture-template's
  * hud/Hud.ts; the frame and states arrive over the socket instead of
  * from a local engine, and the landmark drawing is our own twenty lines
- * so the page does not ship MediaPipe just to draw a skeleton.
+ * so the page does not ship MediaPipe just to draw a skeleton. Gesture
+ * scores are not drawn here: live.ts lists them beside the video, where
+ * text is legible over any background.
  */
 import type { Remote } from "./remote";
-import type { DeltaMsg, FrameMsg, HandInfo, HandKey } from "./types";
+import type { DeltaMsg, FrameMsg, HandInfo } from "./types";
 
 const COLORS = { left: "#4cc9f0", right: "#f72585", both: "#ffd166" } as const;
 
@@ -73,12 +75,6 @@ export class Hud {
     for (const hand of frame.hands) this.drawHand(hand);
     for (const d of this.lastDeltas.values()) this.drawDrag(d);
 
-    // Text must read correctly, so it is drawn in a counter-flipped context.
-    ctx.save();
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    this.drawScores(frame);
-    ctx.restore();
   }
 
   private drawHand(hand: HandInfo): void {
@@ -121,45 +117,5 @@ export class Hud {
     ctx.beginPath();
     ctx.arc(fx, fy, 6, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  private drawScores(frame: FrameMsg): void {
-    const { ctx } = this;
-    // Scale text with the canvas so it reads the same at any video size.
-    const fs = Math.round(this.canvas.width / 60);
-    ctx.font = `${fs}px ui-monospace, monospace`;
-    ctx.textBaseline = "top";
-    const columns = { left: fs, right: this.canvas.width - fs * 24, both: this.canvas.width / 2 - fs * 12 } as const;
-    const seen = new Set<string>();
-    for (const hand of frame.hands) {
-      if (seen.has(hand.handedness)) continue;
-      seen.add(hand.handedness);
-      this.drawColumn(frame, hand.handedness, columns[hand.handedness], fs, `${hand.handedness.toUpperCase()}  pose=${hand.poseLabel} ${hand.poseScore.toFixed(2)}`);
-    }
-    if (frame.hands.length >= 2) this.drawColumn(frame, "both", columns.both, fs, "BOTH");
-  }
-
-  private drawColumn(frame: FrameMsg, hand: HandKey, x: number, fs: number, title: string): void {
-    const { ctx } = this;
-    let y = fs;
-    ctx.fillStyle = COLORS[hand];
-    ctx.fillText(title, x, y);
-    y += fs * 1.3;
-    for (const g of this.remote.gestures) {
-      if (g.bimanual !== (hand === "both")) continue;
-      const st = frame.states[`${g.id}:${hand}`];
-      if (!st) continue;
-      const engaged = st.state === "active" || st.state === "held";
-      ctx.fillStyle = engaged ? "#ffd166" : "rgba(255,255,255,0.75)";
-      const bar = "#".repeat(Math.round(st.score * 10)).padEnd(10, "·");
-      ctx.fillText(`${g.label.padEnd(13)} ${bar} ${st.state}`, x, y);
-      y += fs * 1.2;
-    }
-    const d = [...this.lastDeltas.values()].find((e) => e.hand === hand);
-    if (d) {
-      ctx.fillStyle = "#ffd166";
-      const v = d.delta;
-      ctx.fillText(`Δ x=${v.x.toFixed(2)} y=${v.y.toFixed(2)} a=${v.angle.toFixed(2)} s=${v.scale.toFixed(2)}`, x, y);
-    }
   }
 }

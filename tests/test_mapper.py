@@ -1,5 +1,6 @@
-"""Hold-key bindings follow the pinch's lifetime; disabling releases held
-keys; press-key fires once on its trigger."""
+"""Hold-key bindings follow the pinch's lifetime (or start at the held
+phase with trigger "hold"); disabling releases held keys; press-key fires
+once on its trigger."""
 from gesture_mac.engine import GestureEngine
 from gesture_mac.gestures.builtin.pinches import IndexPinch
 from gesture_mac.gestures.builtin.poses import Fist
@@ -44,6 +45,23 @@ def test_hold_key_follows_pinch():
     rec = Recorder()
     Mapper(engine, doc_with_hold(), rec)
     pinch_cycle(engine)
+    assert rec.log == [("down", "right-option"), ("up", "right-option")]
+
+
+def test_hold_key_with_hold_trigger_waits_for_the_held_phase():
+    engine = GestureEngine([IndexPinch()])
+    rec = Recorder()
+    doc = doc_with_hold()
+    doc.bindings[0].trigger = "hold"
+    Mapper(engine, doc, rec)
+    # A short pinch (released before hold_ms) presses nothing.
+    pinch_cycle(engine)
+    assert rec.log == []
+    # A long one goes down at the held phase and up on release.
+    for t in range(1000, 1700, 10):
+        engine.update(frame(t, [hand(0.05)]))
+    assert rec.log == [("down", "right-option")]
+    engine.update(frame(1710, [hand(1.0)]))
     assert rec.log == [("down", "right-option"), ("up", "right-option")]
 
 

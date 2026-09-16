@@ -36,7 +36,7 @@ class _Delegate(NSObject):
 
 
 class HudWindow:
-    def __init__(self, title: str = "gesture-mac HUD") -> None:
+    def __init__(self, title: str = "gesture-mac") -> None:
         self.title = title
         self._window: NSWindow | None = None
         self._view: WKWebView | None = None

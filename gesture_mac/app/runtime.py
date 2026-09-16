@@ -21,13 +21,13 @@ from typing import Callable
 import numpy as np
 
 from ..capture.camera import Camera
-from ..capture.cameras import CameraInfo, camera_authorized, list_cameras, resolve_camera
+from ..capture.cameras import CameraInfo, camera_authorized, camera_status_authorized, list_cameras, resolve_camera
 from ..capture.tracker import Tracker
 from ..capture.types import Frame
 from ..engine import GestureEngine
 from ..gestures import GestureThresholds, default_gestures
 from ..mapping import Mapper, load_document
-from ..output import MacPerformer
+from ..output import MacPerformer, accessibility_trusted
 from .config import Config, ensure_mappings
 
 log = logging.getLogger(__name__)
@@ -66,6 +66,9 @@ class Runtime:
         self.camera_ok = camera_authorized()
         if not self.camera_ok:
             self.on_status("camera permission denied")
+        if not accessibility_trusted(prompt=True):
+            log.warning("Accessibility not granted: key and scroll events will be dropped")
+            self.on_status("no Accessibility grant: keys dropped")
         self._thread.start()
 
     def stop(self) -> None:
@@ -118,9 +121,11 @@ class Runtime:
         try:
             while not self._stop.is_set():
                 if not self.camera_ok:
-                    self.on_status("camera permission denied")
-                    time.sleep(5)
-                    continue
+                    self.camera_ok = camera_status_authorized()
+                    if not self.camera_ok:
+                        self.on_status("camera permission denied (System Settings > Privacy & Security > Camera)")
+                        time.sleep(5)
+                        continue
                 if not self.cfg.enabled:
                     if camera is not None:
                         camera.release()

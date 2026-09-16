@@ -25,6 +25,7 @@ post real events.
 Before launching, check nothing is already running: `pgrep -fl gesture-mac`.
 Two instances fight over the camera and both post keys. Alex may have it
 running as `~/Applications/gesture-mac.app` (built by scripts/make-app.sh,
+which also renders the icon via scripts/make-icon.py,
 log in ~/Library/Logs/gesture-mac.log); that instance shows up in the same
 pgrep and its parent is launchd, not a shell.
 
@@ -41,7 +42,12 @@ is the rumps menu bar, the config files, and the capture thread that ties
 the layers together. `ui/` is the HUD: an aiohttp server (static page, JSON
 API for mappings and thresholds, websocket stream of frames and events) and
 the WebKit window the menu opens it in. The page itself is TypeScript in
-ui/web/, ported from the template's hud/ and panel/, built into ui/static/. Each package's `__init__.py` docstring says what it
+ui/web/, built into ui/static/, laid out like BetterTouchTool: bindings.ts
+is the list of every binding plus the selected one's detail pane, live.ts
+is the readout beside the video (hands in view, non-idle gestures with
+score bars; nothing is drawn as text on the camera canvas), hud.ts draws
+the mirrored frame and skeleton, keys.ts records a chord from the
+keyboard. The video and readout stream only while the page is open. Each package's `__init__.py` docstring says what it
 owns; the top-level `gesture_mac/__init__.py` lists the import order.
 
 ## Rules that keep it clean
@@ -56,7 +62,8 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 - **Nothing per-client runs without a client.** The preview image, the
   engine subscription, and the frame loop start on the first websocket
   and stop on the last close (ui/wire.py Publisher). The server thread
-  itself starts on the first Open HUD and then idles.
+  itself starts on the first Configure and then idles. The page's live
+  view is off by default (remembered per page); off closes the socket.
 - **The page never trusts itself about keys.** Chords are validated by
   the app (output/keys.py) before a document is saved, and a saved
   document is parsed by the same loader the mapper uses.
@@ -76,6 +83,12 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
   in the capture thread (Alex, 2026-09-15: a video call must be able to
   take it). Nothing else may hold the camera open while disabled, the HUD
   included.
+- **A hold-key binding's trigger is "engage" or "hold".** Engage (the
+  default) puts the key down as soon as the gesture engages; hold waits
+  for the held phase (hold_ms after engage), so a passing pose cannot
+  fire it (Alex, 2026-09-15: the point gesture was triggering by
+  accident). Either way the key stays down until release. Other trigger
+  values on a hold-key binding behave as engage.
 - **Held keys never stick.** Anything that can stop the mapper (disable,
   reload, quit) goes through `Mapper.release_all()`.
 - **Bindings serialize.** New binding fields get a default and a JSON key
@@ -86,6 +99,9 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 - **Comments say why, docstrings say what.** Every module opens with a
   docstring naming what it owns. No commentary inside functions unless the
   line would puzzle a reader.
+- **The menu bar icon is an SF Symbol template image** (hand.raised, and
+  hand.raised.slash while disabled), never an emoji or a colored bitmap,
+  so it matches the system's own status items in light and dark.
 - No em dashes anywhere in prose or comments.
 
 ## On-disk state
@@ -99,8 +115,12 @@ and hot-reloads; hand edits need Reload mappings in the menu.
 
 The wire format lives in two places by hand: `gesture_mac/ui/wire.py` and
 `ui/web/src/types.ts`. A new action kind touches mapping/actions.py, the
-performer, both of those, and one row in ui/web/src/panel.ts (fillAction
-and the Add row). Threshold edits from the panel are live and unsaved, the
+performer, both of those, and ui/web/src/bindings.ts (KINDS, the Action
+section of renderDetail, summary(), and startDraft's default). A new key
+token touches output/keys.py and the code table in ui/web/src/keys.ts.
+A new binding is a draft in the page until Save, because the app rejects
+a document whose key chord is empty; edits to an existing binding write
+through at once. Threshold edits from the panel are live and unsaved, the
 same as the template.
 
 ## Things that are guesses until tuned with a real hand
@@ -118,8 +138,18 @@ AVFoundation enumerate in the same order).
   Google's CDN if missing).
 - The process posting events needs Accessibility permission: System
   Settings > Privacy & Security > Accessibility, add the terminal the app
-  was launched from (or the .app once packaged). Without it, events are
-  silently dropped.
+  was launched from (or the .app). Without it, events are silently
+  dropped; the status line says "no Accessibility grant: keys dropped" at
+  start. Re-running make-app.sh in a way that changes Info.plist or the
+  launcher re-seals the bundle with a new code hash, and macOS then
+  treats it as a different app. Toggling the switch in System Settings
+  does not help (it keeps the stale hash and, because an entry exists,
+  the app's prompt is refused silently). Clear the entry and relaunch:
+  `tccutil reset Accessibility com.alexhagemeister.gesture-mac`
+  (observed and fixed 2026-09-15 after the icon was added). The Camera grant resets
+  the same way, and macOS then reports it denied rather than asking
+  again; the capture loop polls the grant every 5 s so re-granting in
+  System Settings needs no relaunch.
 - MediaPipe handedness assumes a selfie-view source. `flip_handedness` in
   config exists for a non-selfie camera.
 - Synthesized right-option (flagsChanged with the right-side device bit)
