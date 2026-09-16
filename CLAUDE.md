@@ -41,7 +41,12 @@ is the rumps menu bar, the config files, and the capture thread that ties
 the layers together. `ui/` is the HUD: an aiohttp server (static page, JSON
 API for mappings and thresholds, websocket stream of frames and events) and
 the WebKit window the menu opens it in. The page itself is TypeScript in
-ui/web/, ported from the template's hud/ and panel/, built into ui/static/. Each package's `__init__.py` docstring says what it
+ui/web/, built into ui/static/, laid out like BetterTouchTool: bindings.ts
+is the list of every binding plus the selected one's detail pane, live.ts
+is the readout beside the video (hands in view, non-idle gestures with
+score bars; nothing is drawn as text on the camera canvas), hud.ts draws
+the mirrored frame and skeleton, keys.ts records a chord from the
+keyboard. The video and readout stream only while the page is open. Each package's `__init__.py` docstring says what it
 owns; the top-level `gesture_mac/__init__.py` lists the import order.
 
 ## Rules that keep it clean
@@ -76,6 +81,12 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
   in the capture thread (Alex, 2026-09-15: a video call must be able to
   take it). Nothing else may hold the camera open while disabled, the HUD
   included.
+- **A hold-key binding's trigger is "engage" or "hold".** Engage (the
+  default) puts the key down as soon as the gesture engages; hold waits
+  for the held phase (hold_ms after engage), so a passing pose cannot
+  fire it (Alex, 2026-09-15: the point gesture was triggering by
+  accident). Either way the key stays down until release. Other trigger
+  values on a hold-key binding behave as engage.
 - **Held keys never stick.** Anything that can stop the mapper (disable,
   reload, quit) goes through `Mapper.release_all()`.
 - **Bindings serialize.** New binding fields get a default and a JSON key
@@ -99,8 +110,12 @@ and hot-reloads; hand edits need Reload mappings in the menu.
 
 The wire format lives in two places by hand: `gesture_mac/ui/wire.py` and
 `ui/web/src/types.ts`. A new action kind touches mapping/actions.py, the
-performer, both of those, and one row in ui/web/src/panel.ts (fillAction
-and the Add row). Threshold edits from the panel are live and unsaved, the
+performer, both of those, and ui/web/src/bindings.ts (KINDS, the Action
+section of renderDetail, summary(), and startDraft's default). A new key
+token touches output/keys.py and the code table in ui/web/src/keys.ts.
+A new binding is a draft in the page until Save, because the app rejects
+a document whose key chord is empty; edits to an existing binding write
+through at once. Threshold edits from the panel are live and unsaved, the
 same as the template.
 
 ## Things that are guesses until tuned with a real hand

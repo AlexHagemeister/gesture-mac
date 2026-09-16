@@ -1,19 +1,24 @@
 /**
- * Page wiring: fetch state, mount the HUD and panel, open the stream.
- * The header line shows connection, frame rate, and hands in view.
+ * Page wiring: fetch state, mount the three regions (bindings list, the
+ * selected binding's detail, the live view with its readout), open the
+ * stream. The header line shows connection, frame rate, and hands in view.
  */
 import "./style.css";
 import { Remote } from "./remote";
 import { Hud } from "./hud";
-import { Panel } from "./panel";
+import { Live } from "./live";
+import { Bindings } from "./bindings";
 
 async function main(): Promise<void> {
-  const app = document.getElementById("app")!;
   const status = document.getElementById("status")!;
+  const listMount = document.getElementById("list")!;
+  const detailMount = document.getElementById("detail")!;
+  const liveMount = document.getElementById("live")!;
   const remote = new Remote();
   await remote.init();
-  const hud = new Hud(remote, app);
-  new Panel(remote, app);
+  const hud = new Hud(remote, liveMount);
+  new Live(remote, liveMount);
+  new Bindings(remote, listMount, detailMount);
 
   let hands = 0;
   remote.on("frame", (f) => { hands = f.hands.length; });

@@ -29,7 +29,10 @@ ported one to one, driving macOS through Quartz CGEvents.
    template's hud/ and panel/ ported to run over a websocket, opened in
    an app-owned WebKit window from the menu. Frame encoding and streaming
    run only while the page is open. (Built 2026-09-15; the panel edits
-   hold-key, press-key, and scroll controls.)
+   hold-key, press-key, and scroll controls. Relaid the same evening as
+   a BetterTouchTool-style bindings list with a detail pane, a key
+   recorder, and a readout of active gestures beside the video instead
+   of text over it.)
 3. **Continuous axes.** Scroll from pinch-and-drag deltas. Volume. The
    performer for scroll exists already; the bindings need the panel to be
    worth editing.

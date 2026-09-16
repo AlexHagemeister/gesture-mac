@@ -68,10 +68,13 @@ class Mapper:
                 continue
             a = c.action
             if isinstance(a, HoldKey):
-                # A held key follows the gesture's lifetime regardless of the
-                # binding's trigger. Release always goes through so a key
-                # never sticks after the app is disabled mid-pinch.
-                if e.phase == "engage" and self.enabled and a.key not in self._held:
+                # A held key goes down on engage (default) or, with trigger
+                # "hold", only once the gesture has been held for hold_ms, so
+                # a passing pose cannot fire it. Either way it stays down
+                # until the gesture releases, and release always goes through
+                # so a key never sticks after the app is disabled mid-pinch.
+                down_on = "hold" if b.trigger == "hold" else "engage"
+                if e.phase == down_on and self.enabled and a.key not in self._held:
                     self._held.add(a.key)
                     self.performer.key_down(a.key)
                 elif e.phase == "release" and a.key in self._held:
