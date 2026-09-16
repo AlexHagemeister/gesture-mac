@@ -34,6 +34,11 @@ class Config:
     idle_after_s: float = 3.0
     flip_handedness: bool = False
     """Set true for a non-selfie camera (rear-facing or mirrored feed)."""
+    hand_confidence: float = 0.7
+    """Floor for the tracker's detection, presence, and tracking confidence
+    (MediaPipe default 0.5 tracked a pillow corner as a hand: issue #12)."""
+    min_in_frame: float = 0.9
+    """Fraction of a hand's landmarks that must be inside the image."""
     hud_port: int = 8765
     """Local port for the HUD page. Bound to 127.0.0.1 only."""
 

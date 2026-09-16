@@ -107,7 +107,7 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 ## On-disk state
 
 `~/Library/Application Support/gesture-mac/config.json` (enabled, camera
-name, frame rates, HUD port) and `mappings.json` (seeded from
+name, frame rates, hand-acceptance floors, HUD port) and `mappings.json` (seeded from
 `presets/default.json` on first run). The HUD panel writes mappings.json
 and hot-reloads; hand edits need Reload mappings in the menu.
 
@@ -127,7 +127,7 @@ same as the template.
 
 Pinch closeness bounds (0.2 to 0.5 hand lengths), One Euro constants, flick
 thresholds (0.6 hand lengths within 500 ms), the pose classifier's looseness
-on Point and Thumbs up, the frame rates in config (30 active, a ceiling the camera's own rate also caps; 4 idle), and
+on Point and Thumbs up, the frame rates in config (30 active, a ceiling the camera's own rate also caps; 4 idle), the tracker's hand_confidence (0.7) and min_in_frame (0.9) floors in config (raised from MediaPipe's 0.5 after a pillow corner tracked as a hand, issue #12), and
 the camera index mapping in capture/cameras.py (assumes OpenCV and
 AVFoundation enumerate in the same order).
 

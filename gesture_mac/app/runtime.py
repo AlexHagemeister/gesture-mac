@@ -114,7 +114,11 @@ class Runtime:
     # ---- the loop --------------------------------------------------------
 
     def _run(self) -> None:
-        tracker = Tracker(flip_handedness=self.cfg.flip_handedness)
+        tracker = Tracker(
+            flip_handedness=self.cfg.flip_handedness,
+            hand_confidence=self.cfg.hand_confidence,
+            min_in_frame=self.cfg.min_in_frame,
+        )
         camera: Camera | None = None
         last_hand_t = time.monotonic()
         frames, report_t = 0, time.monotonic()
