@@ -1,6 +1,9 @@
 """The rumps menu bar app. Top item is the on/off toggle; below it the
-camera picker, mapping reload, and quit. The runtime thread does the work;
-this file only wires menu items to it and persists config changes.
+camera picker, the HUD, mapping reload, and quit. The runtime thread does
+the work; this file only wires menu items to it and persists config changes.
+
+The HUD server starts the first time its menu item is chosen and then
+idles; the stream itself runs only while the window has the page open.
 """
 from __future__ import annotations
 
@@ -11,6 +14,7 @@ import rumps
 
 log = logging.getLogger(__name__)
 
+from ..ui import HudWindow, UiServer
 from .config import MAPPINGS_PATH, Config, load_config, save_config
 from .runtime import Runtime
 
@@ -24,6 +28,8 @@ class GestureMacApp(rumps.App):
         self.cfg: Config = load_config()
         self._pending_status: str | None = None
         self.runtime = Runtime(self.cfg, on_status=self._status)
+        self.ui: UiServer | None = None
+        self.hud_window = HudWindow()
 
         self.enabled_item = rumps.MenuItem("Gestures enabled", callback=self.toggle_enabled)
         self.enabled_item.state = self.cfg.enabled
@@ -37,6 +43,7 @@ class GestureMacApp(rumps.App):
             self.status_item,
             None,
             self.camera_menu,
+            rumps.MenuItem("Open HUD", callback=self.open_hud),
             rumps.MenuItem("Reload mappings", callback=self.reload_mappings),
             rumps.MenuItem("Open mappings.json", callback=self.open_mappings),
             None,
@@ -80,7 +87,20 @@ class GestureMacApp(rumps.App):
     def open_mappings(self, _item) -> None:
         subprocess.run(["open", "-t", str(MAPPINGS_PATH)], check=False)
 
+    def open_hud(self, _item) -> None:
+        try:
+            if self.ui is None:
+                self.ui = UiServer(self.runtime, self.cfg.hud_port)
+            url = self.ui.start()
+        except RuntimeError as e:
+            self._status(str(e))
+            return
+        self.hud_window.show(url)
+
     def quit(self, _item) -> None:
+        self.hud_window.close()
+        if self.ui is not None:
+            self.ui.stop()
         self.runtime.stop()
         rumps.quit_application()
 

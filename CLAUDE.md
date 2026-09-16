@@ -10,14 +10,23 @@ milestones; this file is for agents working in the repo.
 uv sync                 # create .venv with all deps (Python 3.12)
 uv run pytest -q        # headless tests: engine, mapper, key chords (~1 s)
 uv run gesture-mac      # launch the menu-bar app (needs camera + Accessibility permission)
+cd ui/web && pnpm install && pnpm build   # rebuild the HUD page into gesture_mac/ui/static/ (commit the output)
 ```
+
+The built page is committed so the app runs without node. After any change
+under ui/web/src, run the build and commit static/ with it. `pnpm dev` in
+ui/web serves the page with hot reload, proxying /api and /ws to a running
+app on 8765.
 
 Run the tests before every commit. Launch the app to verify anything that
 touches capture/, output/, or app/, since tests cannot see a camera or
 post real events.
 
-Before launching, check nothing is already running: `pgrep -fl gesture_mac`.
-Two instances fight over the camera and both post keys.
+Before launching, check nothing is already running: `pgrep -fl gesture-mac`.
+Two instances fight over the camera and both post keys. Alex may have it
+running as `~/Applications/gesture-mac.app` (built by scripts/make-app.sh,
+log in ~/Library/Logs/gesture-mac.log); that instance shows up in the same
+pgrep and its parent is launchd, not a shell.
 
 ## Architecture in one paragraph
 
@@ -29,14 +38,28 @@ and emits `gesture` events (engage, hold, release, flick) and `delta` events
 those to bindings from a JSON document and hands `Action` objects to a
 `Performer`. `output/` is the Mac performer (CGEvent via PyObjC). `app/`
 is the rumps menu bar, the config files, and the capture thread that ties
-the layers together. Each package's `__init__.py` docstring says what it
+the layers together. `ui/` is the HUD: an aiohttp server (static page, JSON
+API for mappings and thresholds, websocket stream of frames and events) and
+the WebKit window the menu opens it in. The page itself is TypeScript in
+ui/web/, ported from the template's hud/ and panel/, built into ui/static/. Each package's `__init__.py` docstring says what it
 owns; the top-level `gesture_mac/__init__.py` lists the import order.
 
 ## Rules that keep it clean
 
 - **Import downward only.** capture <- gestures <- engine <- mapping <- output <- app.
   Only capture/tracker.py imports MediaPipe. Only output/ imports Quartz.
-  Only app/ imports rumps. Landmarks never leave capture/ and gestures/.
+  Only app/ imports rumps. Landmarks never leave capture/ and gestures/
+  (the HUD feed carries them to the page; nothing in Python consumes them).
+- **ui/ reads the runtime; the runtime never reads ui/.** ui/ imports
+  app/runtime.py and app/config.py; only app/menubar.py imports ui/. Only
+  ui/window.py imports WebKit.
+- **Nothing per-client runs without a client.** The preview image, the
+  engine subscription, and the frame loop start on the first websocket
+  and stop on the last close (ui/wire.py Publisher). The server thread
+  itself starts on the first Open HUD and then idles.
+- **The page never trusts itself about keys.** Chords are validated by
+  the app (output/keys.py) before a document is saved, and a saved
+  document is parsed by the same loader the mapper uses.
 - **A gesture is one class with `score()` (and `anchor()` if continuous),
   registered in `gestures/registry.py`.** Thresholds, hysteresis, timing,
   per-hand instances, and delta tracking belong to `gestures/base.py`.
@@ -49,6 +72,10 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 - **Two thresholds, not one.** Enter above exit.
 - **Actions are data** (`mapping/actions.py`); performing them is `output/`'s
   job. The mapper never imports Quartz. Tests use a recording fake performer.
+- **Off means the camera is free.** The master switch releases the camera
+  in the capture thread (Alex, 2026-09-15: a video call must be able to
+  take it). Nothing else may hold the camera open while disabled, the HUD
+  included.
 - **Held keys never stick.** Anything that can stop the mapper (disable,
   reload, quit) goes through `Mapper.release_all()`.
 - **Bindings serialize.** New binding fields get a default and a JSON key
@@ -64,8 +91,17 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 ## On-disk state
 
 `~/Library/Application Support/gesture-mac/config.json` (enabled, camera
-name, frame rates) and `mappings.json` (seeded from `presets/default.json`
-on first run). Edit mappings.json by hand, then Reload mappings in the menu.
+name, frame rates, HUD port) and `mappings.json` (seeded from
+`presets/default.json` on first run). The HUD panel writes mappings.json
+and hot-reloads; hand edits need Reload mappings in the menu.
+
+## Keeping the page and the app in step
+
+The wire format lives in two places by hand: `gesture_mac/ui/wire.py` and
+`ui/web/src/types.ts`. A new action kind touches mapping/actions.py, the
+performer, both of those, and one row in ui/web/src/panel.ts (fillAction
+and the Add row). Threshold edits from the panel are live and unsaved, the
+same as the template.
 
 ## Things that are guesses until tuned with a real hand
 

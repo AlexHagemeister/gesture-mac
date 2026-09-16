@@ -1,9 +1,13 @@
 """The capture thread. Owns the camera, tracker, engine, mapper, and
 performer, and runs the loop: read frame -> track -> engine.update, at
-cfg.fps while a hand is in view and cfg.idle_fps otherwise.
+cfg.fps while a hand is in view and cfg.idle_fps otherwise. While gestures
+are disabled the camera is released, so another app (a video call) can
+have it; enabling reopens it.
 
 The menu bar talks to it through set_enabled(), set_camera(), reload_mappings(),
-and stop(). Everything else is private to the thread.
+and stop(). The HUD server reads last_frame and last_bgr (kept only while
+set_preview(True)) and edits thresholds through set_thresholds(). Everything
+else is private to the thread.
 """
 from __future__ import annotations
 
@@ -11,14 +15,17 @@ import logging
 import os
 import threading
 import time
+from dataclasses import replace
 from typing import Callable
+
+import numpy as np
 
 from ..capture.camera import Camera
 from ..capture.cameras import CameraInfo, camera_authorized, list_cameras, resolve_camera
 from ..capture.tracker import Tracker
 from ..capture.types import Frame
 from ..engine import GestureEngine
-from ..gestures import default_gestures
+from ..gestures import GestureThresholds, default_gestures
 from ..mapping import Mapper, load_document
 from ..output import MacPerformer
 from .config import Config, ensure_mappings
@@ -39,10 +46,16 @@ class Runtime:
         self.cameras: list[CameraInfo] = list_cameras()
         self.camera_info: CameraInfo | None = resolve_camera(cfg.camera, self.cameras)
         self._camera_change = threading.Event()
+        self._wake = threading.Event()
+        """Set by set_enabled so a disabled loop reopens the camera at once."""
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="gesture-capture", daemon=True)
         self.last_frame: Frame | None = None
         """Most recent frame, for a HUD to read. Written by the thread."""
+        self.last_bgr: np.ndarray | None = None
+        """The image behind last_frame, kept only while a HUD client wants
+        it (set_preview). Encoding is the client's problem, not this thread's."""
+        self._preview = False
 
     # ---- controls from the menu bar -------------------------------------
 
@@ -63,6 +76,7 @@ class Runtime:
     def set_enabled(self, on: bool) -> None:
         self.cfg.enabled = on
         self.mapper.set_enabled(on)
+        self._wake.set()
 
     def set_camera(self, info: CameraInfo) -> None:
         self.cfg.camera = info.name
@@ -77,6 +91,23 @@ class Runtime:
         self.mapper.load(load_document(ensure_mappings()))
         self.on_status("mappings reloaded")
 
+    # ---- controls from the HUD server -------------------------------------
+
+    def set_preview(self, on: bool) -> None:
+        """Keep the raw image around for the HUD. Off drops it so nothing is
+        retained for a page nobody is looking at."""
+        self._preview = on
+        if not on:
+            self.last_bgr = None
+
+    def set_thresholds(self, gesture_id: str, **patch: float) -> GestureThresholds:
+        """Live threshold edit from the panel. Not persisted, like the template."""
+        g = self.engine.get_gesture(gesture_id)
+        if g is None:
+            raise KeyError(gesture_id)
+        g.thresholds = replace(g.thresholds, **patch)
+        return g.thresholds
+
     # ---- the loop --------------------------------------------------------
 
     def _run(self) -> None:
@@ -89,6 +120,16 @@ class Runtime:
                 if not self.camera_ok:
                     self.on_status("camera permission denied")
                     time.sleep(5)
+                    continue
+                if not self.cfg.enabled:
+                    if camera is not None:
+                        camera.release()
+                        camera = None
+                        self.last_frame = None
+                        self.last_bgr = None
+                        self.on_status("off, camera released")
+                    self._wake.wait(0.5)
+                    self._wake.clear()
                     continue
                 if camera is None or self._camera_change.is_set():
                     self._camera_change.clear()
@@ -119,6 +160,8 @@ class Runtime:
                 if frame.hands:
                     last_hand_t = time.monotonic()
                 self.last_frame = frame
+                if self._preview:
+                    self.last_bgr = bgr
                 self.engine.update(frame)
                 frames += 1
                 if time.monotonic() - report_t >= 2.0:

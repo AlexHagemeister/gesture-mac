@@ -1,7 +1,7 @@
 """On-disk settings. Everything lives under
 ~/Library/Application Support/gesture-mac/:
 
-    config.json     enabled, camera name, frame rates
+    config.json     enabled, camera name, frame rates, HUD port
     mappings.json   the bindings document (seeded from presets/default.json)
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ DEFAULT_PRESET = Path(__file__).resolve().parents[2] / "presets" / "default.json
 @dataclass(slots=True)
 class Config:
     enabled: bool = True
-    """Whether gestures perform actions. Tracking runs either way."""
+    """The master switch: off releases the camera and performs nothing."""
     camera: str | None = None
     """Camera name as AVFoundation reports it; None = built-in."""
     fps: float = 15.0
@@ -30,6 +30,8 @@ class Config:
     idle_after_s: float = 3.0
     flip_handedness: bool = False
     """Set true for a non-selfie camera (rear-facing or mirrored feed)."""
+    hud_port: int = 8765
+    """Local port for the HUD page. Bound to 127.0.0.1 only."""
 
 
 def load_config() -> Config:
