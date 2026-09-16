@@ -80,7 +80,7 @@ export class Live {
       if (d) {
         const line = document.createElement("div");
         line.className = "delta";
-        line.textContent = `Δ x ${d.delta.x.toFixed(2)}  y ${d.delta.y.toFixed(2)}  angle ${d.delta.angle.toFixed(2)}  scale ${d.delta.scale.toFixed(2)}`;
+        line.textContent = `Δ x ${d.delta.x.toFixed(2)}  y ${d.delta.y.toFixed(2)}  angle ${d.delta.angle.toFixed(2)}  scale ${d.delta.scale.toFixed(2)}  ·  at x ${d.abs.x.toFixed(2)}  y ${d.abs.y.toFixed(2)}`;
         block.append(line);
       }
       blocks.push(block);
