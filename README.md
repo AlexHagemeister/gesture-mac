@@ -16,6 +16,19 @@ Grant camera access when asked. Grant Accessibility to the terminal you
 launched from (System Settings > Privacy & Security > Accessibility), or
 key events go nowhere.
 
+## Run without a terminal
+
+```bash
+./scripts/make-app.sh
+```
+
+builds `~/Applications/gesture-mac.app`, a launcher that runs the same
+command with its output in `~/Library/Logs/gesture-mac.log`. Open it from
+Finder or Spotlight, and add it under System Settings > General > Login
+Items to start it at login. The bundle is what macOS asks camera and
+Accessibility permission for, so grant both to "gesture-mac" once. Re-run
+the script if the repo or uv moves.
+
 Menu: **Gestures enabled** (the master switch, top of the menu), status
 line, **Camera** picker, **Open HUD**, **Reload mappings**,
 **Open mappings.json**, Quit.

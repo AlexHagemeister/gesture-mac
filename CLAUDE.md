@@ -22,8 +22,11 @@ Run the tests before every commit. Launch the app to verify anything that
 touches capture/, output/, or app/, since tests cannot see a camera or
 post real events.
 
-Before launching, check nothing is already running: `pgrep -fl gesture_mac`.
-Two instances fight over the camera and both post keys.
+Before launching, check nothing is already running: `pgrep -fl gesture-mac`.
+Two instances fight over the camera and both post keys. Alex may have it
+running as `~/Applications/gesture-mac.app` (built by scripts/make-app.sh,
+log in ~/Library/Logs/gesture-mac.log); that instance shows up in the same
+pgrep and its parent is launchd, not a shell.
 
 ## Architecture in one paragraph
 

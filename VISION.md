@@ -37,9 +37,10 @@ ported one to one, driving macOS through Quartz CGEvents.
 
 ## Non-goals, for now
 
-- A login item. Launched by hand until it earns autostart.
+- A full .app build. scripts/make-app.sh wraps `uv run` in a launcher
+  bundle (2026-09-15) so the app runs without a terminal and can be a
+  login item; a self-contained bundle is still parked.
 - A global hotkey for the on/off toggle. Wanted eventually; needs a free chord.
-- Packaging as a .app bundle. `uv run gesture-mac` is enough.
 
 ## Principles carried from the template
 
