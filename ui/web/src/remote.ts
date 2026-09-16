@@ -60,9 +60,23 @@ export class Remote {
     };
   }
 
-  close(): void {
+  /** Drop the stream (no reconnect) until resume(). The app stops
+   * encoding frames when its last client leaves, so a hidden live view
+   * costs nothing. */
+  pause(): void {
     this.closed = true;
     this.socket?.close();
+    this.socket = null;
+  }
+
+  resume(): void {
+    if (!this.closed) return;
+    this.closed = false;
+    this.connect();
+  }
+
+  close(): void {
+    this.pause();
   }
 
   /** Replace the mapping document. The app validates, saves, hot-reloads. */

@@ -31,16 +31,18 @@ the script if the repo or uv moves.
 
 Menu: **Gestures enabled** (the master switch, top of the menu: off
 releases the camera for other apps and stops tracking), status
-line, **Camera** picker, **Open HUD**, **Reload mappings**,
+line, **Camera** picker, **Configure**, **Reload mappings**,
 **Open mappings.json**, Quit.
 
-## HUD and mapping panel
+## Configure: the bindings page
 
-**Open HUD** opens a window with the mirror-mode view (your camera, hand
-landmarks, per-gesture scores, drag points) beside the mapping panel: pick a
-gesture and hand, see its bindings, add a control (hold a key, press a key
-chord, scroll), edit chords with the app checking them, tune thresholds live.
-Every edit writes mappings.json and the app reloads it on the spot.
+**Configure** opens a window laid out like BetterTouchTool: every binding in
+a list on the left (gesture, hand, what it does), the selected one in a
+detail pane (gesture and hand, the action with a Record button for the key
+chord, when it fires, a modifier gesture, live thresholds). "Show live view"
+in the header adds the mirror-mode camera with hand landmarks and a readout
+of the gestures currently past idle. Every edit writes mappings.json and the
+app reloads it on the spot.
 
 The page is served by the app at http://127.0.0.1:8765/ (`hud_port` in
 config.json), so it also opens in any browser. Frame encoding and the event

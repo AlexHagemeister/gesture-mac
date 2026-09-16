@@ -21,19 +21,23 @@ html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); display: flex; flex-direction: column; }
 header { padding: calc(var(--gap) * 0.6) var(--gap); display: flex; gap: var(--gap); align-items: baseline; flex: none; border-bottom: 1px solid var(--line); }
 header h1 { font-size: 1.2em; margin: 0; }
-header #status { color: var(--muted); font-size: 0.9em; }
+header #status { color: var(--muted); font-size: 0.9em; flex: 1; }
+header #live-toggle { font-size: 0.85em; padding: 0.35em 0.7em; }
 
 /* Three regions, BetterTouchTool style: the list, the selected binding, the live view. */
 #app {
   flex: 1; min-height: 0;
   display: grid;
-  grid-template-columns: minmax(240px, 22vw) minmax(0, 1fr) minmax(300px, 34vw);
+  grid-template-columns: minmax(240px, 22vw) minmax(0, 1fr);
 }
+body.live-on #app { grid-template-columns: minmax(240px, 22vw) minmax(0, 1fr) minmax(300px, 34vw); }
+
 #list { border-right: 1px solid var(--line); overflow-y: auto; min-height: 0; }
 #detail { overflow-y: auto; min-height: 0; padding: var(--gap); }
-#live { border-left: 1px solid var(--line); overflow-y: auto; min-height: 0; padding: var(--gap); display: flex; flex-direction: column; gap: var(--gap); }
+#live { border-left: 1px solid var(--line); overflow-y: auto; min-height: 0; padding: var(--gap); display: none; flex-direction: column; gap: var(--gap); }
+body.live-on #live { display: flex; }
 @media (max-width: 960px) {
-  #app { grid-template-columns: minmax(220px, 34vw) minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  #app, body.live-on #app { grid-template-columns: minmax(220px, 34vw) minmax(0, 1fr); grid-template-rows: auto 1fr; }
   #live { grid-column: 1 / -1; grid-row: 1; border-left: none; border-bottom: 1px solid var(--line); flex-direction: row; }
   #live .hud { width: 40%; }
 }

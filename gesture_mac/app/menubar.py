@@ -1,8 +1,8 @@
 """The rumps menu bar app. Top item is the on/off toggle; below it the
-camera picker, the HUD, mapping reload, and quit. The runtime thread does
+camera picker, Configure (the bindings page), mapping reload, and quit. The runtime thread does
 the work; this file only wires menu items to it and persists config changes.
 
-The HUD server starts the first time its menu item is chosen and then
+The page's server starts the first time Configure is chosen and then
 idles; the stream itself runs only while the window has the page open.
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ class GestureMacApp(rumps.App):
             self.status_item,
             None,
             self.camera_menu,
-            rumps.MenuItem("Open HUD", callback=self.open_hud),
+            rumps.MenuItem("Configure", callback=self.open_hud),
             rumps.MenuItem("Reload mappings", callback=self.reload_mappings),
             rumps.MenuItem("Open mappings.json", callback=self.open_mappings),
             None,

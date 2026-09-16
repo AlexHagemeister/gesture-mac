@@ -61,7 +61,8 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 - **Nothing per-client runs without a client.** The preview image, the
   engine subscription, and the frame loop start on the first websocket
   and stop on the last close (ui/wire.py Publisher). The server thread
-  itself starts on the first Open HUD and then idles.
+  itself starts on the first Configure and then idles. The page's live
+  view is off by default (remembered per page); off closes the socket.
 - **The page never trusts itself about keys.** Chords are validated by
   the app (output/keys.py) before a document is saved, and a saved
   document is parsed by the same loader the mapper uses.
