@@ -25,9 +25,11 @@ ported one to one, driving macOS through Quartz CGEvents.
 1. **Pinch to dictate.** Menu bar with an on/off toggle at the top, camera
    picker, the engine port with tests, bindings JSON, hold-key and press-key
    actions, the default preset. Usable daily. (This prototype.)
-2. **HUD and mapping panel.** A local web page served by the app, reusing
-   the template's hud/ and panel/ modules over a websocket. Frame encoding
-   and streaming run only while the page is open.
+2. **HUD and mapping panel.** A local web page served by the app, the
+   template's hud/ and panel/ ported to run over a websocket, opened in
+   an app-owned WebKit window from the menu. Frame encoding and streaming
+   run only while the page is open. (Built 2026-09-15; the panel edits
+   hold-key, press-key, and scroll controls.)
 3. **Continuous axes.** Scroll from pinch-and-drag deltas. Volume. The
    performer for scroll exists already; the bindings need the panel to be
    worth editing.

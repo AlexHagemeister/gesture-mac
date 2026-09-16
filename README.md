@@ -17,7 +17,20 @@ launched from (System Settings > Privacy & Security > Accessibility), or
 key events go nowhere.
 
 Menu: **Gestures enabled** (the master switch, top of the menu), status
-line, **Camera** picker, **Reload mappings**, **Open mappings.json**, Quit.
+line, **Camera** picker, **Open HUD**, **Reload mappings**,
+**Open mappings.json**, Quit.
+
+## HUD and mapping panel
+
+**Open HUD** opens a window with the mirror-mode view (your camera, hand
+landmarks, per-gesture scores, drag points) beside the mapping panel: pick a
+gesture and hand, see its bindings, add a control (hold a key, press a key
+chord, scroll), edit chords with the app checking them, tune thresholds live.
+Every edit writes mappings.json and the app reloads it on the spot.
+
+The page is served by the app at http://127.0.0.1:8765/ (`hud_port` in
+config.json), so it also opens in any browser. Frame encoding and the event
+stream run only while a page is connected; tracking runs regardless.
 
 ## Default binding
 
@@ -27,7 +40,8 @@ dictation, a long pinch dictates and pastes on release.
 
 ## Edit bindings
 
-`~/Library/Application Support/gesture-mac/mappings.json`, then Reload
+In the HUD's panel, or by hand in
+`~/Library/Application Support/gesture-mac/mappings.json` followed by Reload
 mappings. Schema in `gesture_mac/mapping/bindings.py`; action kinds and key
 names in `gesture_mac/mapping/actions.py`. Gestures available:
 index-pinch, middle-pinch, open-palm, fist, point, thumbs-up, double-pinch,
@@ -43,6 +57,8 @@ gesture_mac/
   mapping/   bindings JSON, action kinds, Mapper (events -> Performer calls)
   output/    MacPerformer: CGEvent keys and scroll via PyObjC
   app/       config, capture thread (runtime), rumps menu bar, entry point
+  ui/        HUD server (aiohttp: static page, JSON API, websocket), WebKit window, built page in static/
+ui/web/      the page's TypeScript source (Vite); `pnpm build` writes gesture_mac/ui/static/
 presets/     default.json, the seed for a fresh install
-tests/       headless: engine, mapper, key chords
+tests/       headless: engine, mapper, key chords, HUD server
 ```

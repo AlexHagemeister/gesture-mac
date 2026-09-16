@@ -1,0 +1,17 @@
+{
+  "name": "gesture-mac-hud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The HUD and mapping panel page served by gesture-mac. Ported from gesture-template's hud/ and panel/, fed by the app over a websocket.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "packageManager": "pnpm@11.5.0",
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}
