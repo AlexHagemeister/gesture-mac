@@ -20,7 +20,7 @@ DEFAULT_PRESET = Path(__file__).resolve().parents[2] / "presets" / "default.json
 @dataclass(slots=True)
 class Config:
     enabled: bool = True
-    """Whether gestures perform actions. Tracking runs either way."""
+    """The master switch: off releases the camera and performs nothing."""
     camera: str | None = None
     """Camera name as AVFoundation reports it; None = built-in."""
     fps: float = 15.0

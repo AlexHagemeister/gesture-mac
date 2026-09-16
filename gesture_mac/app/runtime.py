@@ -1,6 +1,8 @@
 """The capture thread. Owns the camera, tracker, engine, mapper, and
 performer, and runs the loop: read frame -> track -> engine.update, at
-cfg.fps while a hand is in view and cfg.idle_fps otherwise.
+cfg.fps while a hand is in view and cfg.idle_fps otherwise. While gestures
+are disabled the camera is released, so another app (a video call) can
+have it; enabling reopens it.
 
 The menu bar talks to it through set_enabled(), set_camera(), reload_mappings(),
 and stop(). The HUD server reads last_frame and last_bgr (kept only while
@@ -44,6 +46,8 @@ class Runtime:
         self.cameras: list[CameraInfo] = list_cameras()
         self.camera_info: CameraInfo | None = resolve_camera(cfg.camera, self.cameras)
         self._camera_change = threading.Event()
+        self._wake = threading.Event()
+        """Set by set_enabled so a disabled loop reopens the camera at once."""
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="gesture-capture", daemon=True)
         self.last_frame: Frame | None = None
@@ -72,6 +76,7 @@ class Runtime:
     def set_enabled(self, on: bool) -> None:
         self.cfg.enabled = on
         self.mapper.set_enabled(on)
+        self._wake.set()
 
     def set_camera(self, info: CameraInfo) -> None:
         self.cfg.camera = info.name
@@ -115,6 +120,16 @@ class Runtime:
                 if not self.camera_ok:
                     self.on_status("camera permission denied")
                     time.sleep(5)
+                    continue
+                if not self.cfg.enabled:
+                    if camera is not None:
+                        camera.release()
+                        camera = None
+                        self.last_frame = None
+                        self.last_bgr = None
+                        self.on_status("off, camera released")
+                    self._wake.wait(0.5)
+                    self._wake.clear()
                     continue
                 if camera is None or self._camera_change.is_set():
                     self._camera_change.clear()

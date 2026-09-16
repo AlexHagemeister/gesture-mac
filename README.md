@@ -29,7 +29,8 @@ Items to start it at login. The bundle is what macOS asks camera and
 Accessibility permission for, so grant both to "gesture-mac" once. Re-run
 the script if the repo or uv moves.
 
-Menu: **Gestures enabled** (the master switch, top of the menu), status
+Menu: **Gestures enabled** (the master switch, top of the menu: off
+releases the camera for other apps and stops tracking), status
 line, **Camera** picker, **Open HUD**, **Reload mappings**,
 **Open mappings.json**, Quit.
 

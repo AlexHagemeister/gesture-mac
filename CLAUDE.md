@@ -72,6 +72,10 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 - **Two thresholds, not one.** Enter above exit.
 - **Actions are data** (`mapping/actions.py`); performing them is `output/`'s
   job. The mapper never imports Quartz. Tests use a recording fake performer.
+- **Off means the camera is free.** The master switch releases the camera
+  in the capture thread (Alex, 2026-09-15: a video call must be able to
+  take it). Nothing else may hold the camera open while disabled, the HUD
+  included.
 - **Held keys never stick.** Anything that can stop the mapper (disable,
   reload, quit) goes through `Mapper.release_all()`.
 - **Bindings serialize.** New binding fields get a default and a JSON key
