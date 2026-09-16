@@ -3,7 +3,7 @@
  * list on the left (gesture, hand, what it does), and the selected one
  * opened in a detail pane. A binding row is a gesture-plus-hand that
  * drives a control; the control holds the action (hold a key, press a
- * key, scroll). Two rows can share one control, and the pane says so.
+ * key, scroll, click). Two rows can share one control, and the pane says so.
  *
  * Edits to an existing binding save as they are made (the app validates,
  * writes mappings.json, and hot-reloads). A new binding is a draft in
@@ -13,10 +13,12 @@
  */
 import { recordChord, type Recording } from "./keys";
 import type { Remote } from "./remote";
-import { handMatches, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type ScrollAxis, type Thresholds, type Trigger } from "./types";
+import { handMatches, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type ScrollAxis, type Thresholds, type Trigger } from "./types";
 
 const SINGLE_HANDS: Array<[HandSelector, string]> = [["either", "either hand"], ["left", "left hand"], ["right", "right hand"]];
-const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"]];
+const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"], ["click", "click the mouse"]];
+const BUTTONS: Array<[MouseButton, string]> = [["left", "left button"], ["right", "right button"], ["middle", "middle button"]];
+const CLICK: Action = { type: "click", button: "left", count: 1 };
 const PRESS_TRIGGERS: Array<[Trigger, string]> = [
   ["engage", "on engage"], ["hold", "after held"], ["release", "on release"],
   ["flick-left", "flick left"], ["flick-right", "flick right"], ["flick-up", "flick up"], ["flick-down", "flick down"],
@@ -198,12 +200,12 @@ export class Bindings {
     const d = this.draft;
     if (!d) return;
     const a = d.control.action!;
-    if (a.type !== "scroll") {
+    if ("key" in a) {
       const problem = a.key ? await this.remote.validateKey(a.key) : "type or record a key";
       if (problem) { this.errorEl.textContent = problem; return; }
     }
     const g = this.gesture(d.binding.gestureId);
-    const label = d.control.label.trim() || `${g?.label ?? "gesture"} ${a.type === "scroll" ? "scroll" : a.key}`;
+    const label = d.control.label.trim() || `${g?.label ?? "gesture"} ${"key" in a ? a.key : a.type}`;
     const ok = await this.commit((doc) => {
       const id = uniqueId(slug(label), doc.controls);
       doc.controls.push({ id, label, kind: "action", action: a });
@@ -295,9 +297,10 @@ export class Bindings {
       arow.append(labeled("Kind", select(KINDS, a.type, (v) => {
         const kind = v as ActionType;
         if (kind === "scroll") setAction({ type: "scroll", axis: "y", sensitivity: 40, invert: false });
-        else if (a.type === "scroll") {
-          // Switching from scroll to a key: no key yet, so the change waits
-          // in a draft-like state until a key is recorded.
+        else if (kind === "click") setAction(CLICK);
+        else if (!("key" in a)) {
+          // Switching from scroll or click to a key: no key yet, so the
+          // change waits in a draft-like state until a key is recorded.
           if (draft) setAction({ type: kind, key: "" });
           else { this.errorEl.textContent = "Record a key first, then switch the kind."; this.renderDetail(); }
         } else setAction({ type: kind, key: a.key });
@@ -311,7 +314,16 @@ export class Bindings {
       asec.append(arow);
 
       if (a.type === "hold-key" || a.type === "press-key") asec.append(this.keyEditor(a, draft, setAction));
-      else {
+      else if (a.type === "click") {
+        const crow = el("div", "row");
+        crow.append(
+          labeled("Button", select(BUTTONS, a.button, (v) => setAction({ ...a, button: v as MouseButton }))),
+          labeled("Clicks", select([["1", "single"], ["2", "double"]], String(a.count), (v) => setAction({ ...a, count: v === "2" ? 2 : 1 }))),
+        );
+        const p = el("p", "hint");
+        p.textContent = "Clicks wherever the cursor is. Moving it is the pointer's job (not built yet).";
+        asec.append(crow, p);
+      } else {
         const srow = el("div", "row");
         srow.append(
           labeled("Axis", select([["y", "y (up/down)"], ["x", "x (left/right)"]], a.axis, (v) => setAction({ ...a, axis: v as ScrollAxis }))),
@@ -331,7 +343,7 @@ export class Bindings {
 
     // When it fires.
     const kind = c?.action?.type;
-    if (kind === "hold-key" || kind === "press-key") {
+    if (kind === "hold-key" || kind === "press-key" || kind === "click") {
       const tsec = section("When");
       const trow = el("div", "row");
       const holdMs = g?.thresholds.holdMs ?? 0;
@@ -344,7 +356,7 @@ export class Bindings {
         p.textContent = "Either way the key stays down until the gesture releases. \"After held\" ignores a passing pose.";
         tsec.append(trow, p);
       } else {
-        trow.append(labeled("Press", select(PRESS_TRIGGERS, b.trigger, (v) => updBinding({ trigger: v as Trigger }))));
+        trow.append(labeled(kind === "click" ? "Click" : "Press", select(PRESS_TRIGGERS, b.trigger, (v) => updBinding({ trigger: v as Trigger }))));
         tsec.append(trow);
       }
       pane.append(tsec);
@@ -432,13 +444,14 @@ function summary(c: Control): string {
   if (!a) return c.kind;
   if (a.type === "hold-key") return `hold ${a.key}`;
   if (a.type === "press-key") return `press ${a.key}`;
+  if (a.type === "click") return `${a.count === 2 ? "double-click" : "click"} ${a.button}`;
   return `scroll ${a.axis} ×${a.sensitivity}${a.invert ? " inverted" : ""}`;
 }
 
 function triggerNote(b: Binding, c: Control): string {
   const t = c.action?.type;
   if (t === "hold-key") return b.trigger === "hold" ? " (after held)" : "";
-  if (t === "press-key") return ` (${PRESS_TRIGGERS.find(([k]) => k === b.trigger)?.[1] ?? b.trigger})`;
+  if (t === "press-key" || t === "click") return ` (${PRESS_TRIGGERS.find(([k]) => k === b.trigger)?.[1] ?? b.trigger})`;
   return "";
 }
 

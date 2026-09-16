@@ -1,4 +1,4 @@
-"""CGEvent-based performer: keys and scroll wheel via Quartz.
+"""CGEvent-based performer: keys, scroll wheel, and mouse clicks via Quartz.
 
 Verified 2026-09-15: a synthesized right-option (flagsChanged with the
 Alternate flag plus the right-side device bit) toggles superwhisper, and a
@@ -16,6 +16,12 @@ import time
 import Quartz as Q
 
 from .keys import Chord, parse_chord
+
+MOUSE_BUTTONS: dict[str, tuple[int, int, int]] = {
+    "left": (Q.kCGMouseButtonLeft, Q.kCGEventLeftMouseDown, Q.kCGEventLeftMouseUp),
+    "right": (Q.kCGMouseButtonRight, Q.kCGEventRightMouseDown, Q.kCGEventRightMouseUp),
+    "middle": (Q.kCGMouseButtonCenter, Q.kCGEventOtherMouseDown, Q.kCGEventOtherMouseUp),
+}
 
 
 class MacPerformer:
@@ -78,6 +84,19 @@ class MacPerformer:
         # Pixel units so fractional per-frame steps still move something.
         ev = Q.CGEventCreateScrollWheelEvent(self._src, Q.kCGScrollEventUnitPixel, 2, int(round(dy)), int(round(dx)))
         Q.CGEventPost(Q.kCGHIDEventTap, ev)
+
+    def click(self, button: str, count: int) -> None:
+        """Click where the cursor already is. The click-state field counts
+        up across the presses of a multi-click so the target sees a real
+        double-click rather than two singles."""
+        btn, down, up = MOUSE_BUTTONS[button]
+        where = Q.CGEventGetLocation(Q.CGEventCreate(None))
+        for n in range(1, count + 1):
+            for kind in (down, up):
+                ev = Q.CGEventCreateMouseEvent(self._src, kind, where, btn)
+                Q.CGEventSetIntegerValueField(ev, Q.kCGMouseEventClickState, n)
+                Q.CGEventPost(Q.kCGHIDEventTap, ev)
+                time.sleep(self._press_hold_s)
 
 
 def accessibility_trusted(prompt: bool = False) -> bool:

@@ -8,7 +8,7 @@ from typing import Protocol
 
 from ..engine.engine import GestureEngine
 from ..engine.events import DeltaEvent, GestureEvent
-from .actions import HoldKey, PressKey, Scroll
+from .actions import Click, HoldKey, PressKey, Scroll
 from .bindings import Binding, MappingDocument, Trigger
 
 
@@ -17,6 +17,7 @@ class Performer(Protocol):
     def key_up(self, chord: str) -> None: ...
     def key_press(self, chord: str) -> None: ...
     def scroll(self, dx: float, dy: float) -> None: ...
+    def click(self, button: str, count: int) -> None: ...
 
 
 class Mapper:
@@ -83,6 +84,11 @@ class Mapper:
             elif isinstance(a, PressKey):
                 if self.enabled and b.trigger == fired:
                     self.performer.key_press(a.key)
+            elif isinstance(a, Click):
+                # Each phase fires once per engage in the engine, so one
+                # pinch is one click and a held pinch never repeats.
+                if self.enabled and b.trigger == fired:
+                    self.performer.click(a.button, a.count)
 
     def _on_delta(self, e: DeltaEvent) -> None:
         if not self.enabled:
