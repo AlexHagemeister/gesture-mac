@@ -22,12 +22,19 @@ class Camera:
 
     def read(self, min_interval_s: float) -> np.ndarray | None:
         """Grab a frame, sleeping first so calls are at most 1/min_interval_s
-        per second. Returns None on a read failure."""
+        per second. Returns None on a read failure.
+
+        The interval is measured from the start of the previous read, not its
+        end: cap.read() itself blocks until the camera's next frame, and
+        counting that wait as part of the interval is what let the loop's
+        own sleep, the camera's wait, and tracking stack up to 10 fps against
+        a 15 cap (issue #6). Measured this way, the cap is a ceiling, and a
+        camera slower than it sets the pace on its own."""
         wait = self._last + min_interval_s - time.monotonic()
         if wait > 0:
             time.sleep(wait)
-        ok, bgr = self._cap.read()
         self._last = time.monotonic()
+        ok, bgr = self._cap.read()
         return bgr if ok else None
 
     def release(self) -> None:

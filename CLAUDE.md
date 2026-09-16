@@ -127,7 +127,7 @@ same as the template.
 
 Pinch closeness bounds (0.2 to 0.5 hand lengths), One Euro constants, flick
 thresholds (0.6 hand lengths within 500 ms), the pose classifier's looseness
-on Point and Thumbs up, the frame rates in config (15 active, 4 idle), and
+on Point and Thumbs up, the frame rates in config (30 active, a ceiling the camera's own rate also caps; 4 idle), and
 the camera index mapping in capture/cameras.py (assumes OpenCV and
 AVFoundation enumerate in the same order).
 
