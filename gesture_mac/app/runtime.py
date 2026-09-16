@@ -1,0 +1,131 @@
+"""The capture thread. Owns the camera, tracker, engine, mapper, and
+performer, and runs the loop: read frame -> track -> engine.update, at
+cfg.fps while a hand is in view and cfg.idle_fps otherwise.
+
+The menu bar talks to it through set_enabled(), set_camera(), reload_mappings(),
+and stop(). Everything else is private to the thread.
+"""
+from __future__ import annotations
+
+import logging
+import os
+import threading
+import time
+from typing import Callable
+
+from ..capture.camera import Camera
+from ..capture.cameras import CameraInfo, camera_authorized, list_cameras, resolve_camera
+from ..capture.tracker import Tracker
+from ..capture.types import Frame
+from ..engine import GestureEngine
+from ..gestures import default_gestures
+from ..mapping import Mapper, load_document
+from ..output import MacPerformer
+from .config import Config, ensure_mappings
+
+log = logging.getLogger(__name__)
+
+
+class Runtime:
+    def __init__(self, cfg: Config, on_status: Callable[[str], None] | None = None) -> None:
+        self.cfg = cfg
+        self.on_status = on_status or (lambda s: None)
+        os.environ.setdefault("OPENCV_AVFOUNDATION_SKIP_AUTH", "1")
+        self.camera_ok = False
+        self.engine = GestureEngine(default_gestures())
+        self.mapper = Mapper(self.engine, load_document(ensure_mappings()), MacPerformer())
+        self.mapper.set_enabled(cfg.enabled)
+        self.engine.on("gesture", lambda e: log.info("%s %s %s", e.gesture_id, e.hand, e.phase))
+        self.cameras: list[CameraInfo] = list_cameras()
+        self.camera_info: CameraInfo | None = resolve_camera(cfg.camera, self.cameras)
+        self._camera_change = threading.Event()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="gesture-capture", daemon=True)
+        self.last_frame: Frame | None = None
+        """Most recent frame, for a HUD to read. Written by the thread."""
+
+    # ---- controls from the menu bar -------------------------------------
+
+    def start(self) -> None:
+        """Call on the main thread once the app's run loop exists: the
+        camera permission prompt needs it. OpenCV's own prompt cannot run
+        from the capture thread, hence OPENCV_AVFOUNDATION_SKIP_AUTH."""
+        self.camera_ok = camera_authorized()
+        if not self.camera_ok:
+            self.on_status("camera permission denied")
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=3)
+        self.mapper.dispose()
+
+    def set_enabled(self, on: bool) -> None:
+        self.cfg.enabled = on
+        self.mapper.set_enabled(on)
+
+    def set_camera(self, info: CameraInfo) -> None:
+        self.cfg.camera = info.name
+        self.camera_info = info
+        self._camera_change.set()
+
+    def refresh_cameras(self) -> list[CameraInfo]:
+        self.cameras = list_cameras()
+        return self.cameras
+
+    def reload_mappings(self) -> None:
+        self.mapper.load(load_document(ensure_mappings()))
+        self.on_status("mappings reloaded")
+
+    # ---- the loop --------------------------------------------------------
+
+    def _run(self) -> None:
+        tracker = Tracker(flip_handedness=self.cfg.flip_handedness)
+        camera: Camera | None = None
+        last_hand_t = time.monotonic()
+        frames, report_t = 0, time.monotonic()
+        try:
+            while not self._stop.is_set():
+                if not self.camera_ok:
+                    self.on_status("camera permission denied")
+                    time.sleep(5)
+                    continue
+                if camera is None or self._camera_change.is_set():
+                    self._camera_change.clear()
+                    if camera is not None:
+                        camera.release()
+                    if self.camera_info is None:
+                        self.on_status("no camera found")
+                        time.sleep(2)
+                        self.refresh_cameras()
+                        self.camera_info = resolve_camera(self.cfg.camera, self.cameras)
+                        continue
+                    try:
+                        camera = Camera(self.camera_info.index)
+                        self.on_status(f"camera: {self.camera_info.name}")
+                    except RuntimeError as e:
+                        log.warning("%s", e)
+                        camera = None
+                        self.on_status("camera failed to open")
+                        time.sleep(2)
+                        continue
+
+                idle = time.monotonic() - last_hand_t > self.cfg.idle_after_s
+                rate = self.cfg.idle_fps if idle else self.cfg.fps
+                bgr = camera.read(1.0 / max(rate, 0.5))
+                if bgr is None:
+                    continue
+                frame = tracker.track(bgr)
+                if frame.hands:
+                    last_hand_t = time.monotonic()
+                self.last_frame = frame
+                self.engine.update(frame)
+                frames += 1
+                if time.monotonic() - report_t >= 2.0:
+                    fps = frames / (time.monotonic() - report_t)
+                    self.on_status(f"{fps:.0f} fps, {len(frame.hands)} hand(s){', idle' if idle else ''}")
+                    frames, report_t = 0, time.monotonic()
+        finally:
+            if camera is not None:
+                camera.release()
+            tracker.close()

@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "controls": [
+    {
+      "id": "dictate",
+      "label": "Superwhisper (hold right option)",
+      "kind": "action",
+      "action": { "type": "hold-key", "key": "right-option" }
+    }
+  ],
+  "bindings": [
+    {
+      "id": "b-dictate",
+      "gestureId": "index-pinch",
+      "hand": "right",
+      "controlId": "dictate",
+      "trigger": "engage",
+      "axis": "y",
+      "mode": "relative",
+      "sensitivity": 100.0,
+      "invert": false
+    }
+  ]
+}
