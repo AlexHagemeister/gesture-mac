@@ -88,3 +88,9 @@ AVFoundation enumerate in the same order).
   config exists for a non-selfie camera.
 - Synthesized right-option (flagsChanged with the right-side device bit)
   was verified to toggle superwhisper on 2026-09-15.
+
+## Known behavior
+
+- Pinching while the app's own menu is open toggles superwhisper but the
+  paste on release lands nowhere: an open menu holds keyboard focus. Not a
+  bug. (Observed by Alex, 2026-09-15.)
