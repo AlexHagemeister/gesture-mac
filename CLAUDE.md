@@ -142,8 +142,11 @@ AVFoundation enumerate in the same order).
   dropped; the status line says "no Accessibility grant: keys dropped" at
   start. Re-running make-app.sh in a way that changes Info.plist or the
   launcher re-seals the bundle with a new code hash, and macOS then
-  treats it as a different app: the grant must be removed and re-added
-  (observed 2026-09-15 after the icon was added). The Camera grant resets
+  treats it as a different app. Toggling the switch in System Settings
+  does not help (it keeps the stale hash and, because an entry exists,
+  the app's prompt is refused silently). Clear the entry and relaunch:
+  `tccutil reset Accessibility com.alexhagemeister.gesture-mac`
+  (observed and fixed 2026-09-15 after the icon was added). The Camera grant resets
   the same way, and macOS then reports it denied rather than asking
   again; the capture loop polls the grant every 5 s so re-granting in
   System Settings needs no relaunch.
