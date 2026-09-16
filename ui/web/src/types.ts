@@ -9,12 +9,14 @@ export type Trigger = "engage" | "hold" | "release" | "flick-left" | "flick-righ
 export type Phase = "engage" | "hold" | "release" | "flick";
 export type ScrollAxis = "x" | "y";
 export type MouseButton = "left" | "right" | "middle";
+export type PointerMode = "absolute" | "relative";
 
 export type Action =
   | { type: "hold-key"; key: string }
   | { type: "press-key"; key: string }
   | { type: "scroll"; axis: ScrollAxis; sensitivity: number; invert: boolean }
-  | { type: "click"; button: MouseButton; count: 1 | 2 };
+  | { type: "click"; button: MouseButton; count: 1 | 2 }
+  | { type: "pointer"; left: number; top: number; right: number; bottom: number };
 export type ActionType = Action["type"];
 
 export interface Control {

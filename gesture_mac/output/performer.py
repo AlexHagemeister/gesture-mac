@@ -1,4 +1,5 @@
-"""CGEvent-based performer: keys, scroll wheel, and mouse clicks via Quartz.
+"""CGEvent-based performer: keys, scroll wheel, mouse clicks, and cursor
+moves via Quartz.
 
 Verified 2026-09-15: a synthesized right-option (flagsChanged with the
 Alternate flag plus the right-side device bit) toggles superwhisper, and a
@@ -83,6 +84,14 @@ class MacPerformer:
     def scroll(self, dx: float, dy: float) -> None:
         # Pixel units so fractional per-frame steps still move something.
         ev = Q.CGEventCreateScrollWheelEvent(self._src, Q.kCGScrollEventUnitPixel, 2, int(round(dy)), int(round(dx)))
+        Q.CGEventPost(Q.kCGHIDEventTap, ev)
+
+    def move_to(self, fx: float, fy: float) -> None:
+        # A mouse-moved event rather than a warp, so apps see hover too.
+        # Main display only (issue #9's scope).
+        b = Q.CGDisplayBounds(Q.CGMainDisplayID())
+        where = (b.origin.x + fx * b.size.width, b.origin.y + fy * b.size.height)
+        ev = Q.CGEventCreateMouseEvent(self._src, Q.kCGEventMouseMoved, where, Q.kCGMouseButtonLeft)
         Q.CGEventPost(Q.kCGHIDEventTap, ev)
 
     def click(self, button: str, count: int) -> None:
