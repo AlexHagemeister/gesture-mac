@@ -39,7 +39,13 @@ mkdir -p "\$HOME/Library/Logs"
 exec >> "\$HOME/Library/Logs/gesture-mac.log" 2>&1
 echo "=== launch \$(date)"
 cd "$REPO"
-exec "$UV" run gesture-mac
+# Run uv as a child rather than exec into it: the launcher stays the
+# responsible process, so camera and Accessibility grants belong to
+# "gesture-mac" and survive uv updates. Quit forwards to the child.
+"$UV" run gesture-mac &
+child=\$!
+trap 'kill \$child 2>/dev/null' TERM INT
+wait \$child
 LAUNCH
 chmod +x "$APP/Contents/MacOS/gesture-mac"
 
