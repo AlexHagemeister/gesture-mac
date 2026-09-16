@@ -11,6 +11,7 @@ import logging
 import subprocess
 
 import rumps
+from AppKit import NSImage, NSImageSymbolConfiguration, NSImageSymbolScaleMedium
 
 log = logging.getLogger(__name__)
 
@@ -18,13 +19,23 @@ from ..ui import HudWindow, UiServer
 from .config import MAPPINGS_PATH, Config, load_config, save_config
 from .runtime import Runtime
 
-ICON_ON = "🤏"
-ICON_OFF = "✋"
+ICON_ON = "hand.raised"
+ICON_OFF = "hand.raised.slash"
+"""SF Symbols, drawn as template images so they follow the menu bar's
+light or dark appearance like the system's own icons."""
+
+
+def symbol_image(name: str) -> NSImage:
+    img = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, "gesture-mac")
+    cfg = NSImageSymbolConfiguration.configurationWithPointSize_weight_scale_(16, 0, NSImageSymbolScaleMedium)
+    img = img.imageWithSymbolConfiguration_(cfg)
+    img.setTemplate_(True)
+    return img
 
 
 class GestureMacApp(rumps.App):
     def __init__(self) -> None:
-        super().__init__("gesture-mac", title=ICON_ON, quit_button=None)
+        super().__init__("gesture-mac", quit_button=None)
         self.cfg: Config = load_config()
         self._pending_status: str | None = None
         self.runtime = Runtime(self.cfg, on_status=self._status)
@@ -132,7 +143,14 @@ class GestureMacApp(rumps.App):
         log.info("status: %s", text)
 
     def _apply_icon(self) -> None:
-        self.title = ICON_ON if self.cfg.enabled else ICON_OFF
+        img = symbol_image(ICON_ON if self.cfg.enabled else ICON_OFF)
+        # Before run() rumps reads _icon_nsimage when it creates the status
+        # item; after, the item exists and takes the image directly.
+        item = getattr(getattr(self, "_nsapp", None), "nsstatusitem", None)
+        if item is not None:
+            item.setImage_(img)
+        else:
+            self._icon_nsimage = img
 
 
 def run() -> None:

@@ -4,3 +4,6 @@ __pycache__/
 .pytest_cache/
 models/*.task
 ui/web/node_modules/
+# rendered by scripts/make-icon.py
+scripts/icon.iconset/
+scripts/icon.icns

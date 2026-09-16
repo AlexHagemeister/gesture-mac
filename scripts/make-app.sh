@@ -13,6 +13,10 @@ APP="${1:-$HOME/Applications/gesture-mac.app}"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
+# The icon: rendered from the same SF Symbol the menu bar shows.
+"$UV" run --project "$REPO" python "$REPO/scripts/make-icon.py" "$REPO/scripts/icon" >/dev/null
+cp "$REPO/scripts/icon.icns" "$APP/Contents/Resources/gesture-mac.icns"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -25,6 +29,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>gesture-mac</string>
+  <key>CFBundleIconFile</key><string>gesture-mac</string>
   <key>LSUIElement</key><true/>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSCameraUsageDescription</key><string>gesture-mac reads your webcam to recognize hand gestures.</string>

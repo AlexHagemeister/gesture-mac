@@ -25,6 +25,7 @@ post real events.
 Before launching, check nothing is already running: `pgrep -fl gesture-mac`.
 Two instances fight over the camera and both post keys. Alex may have it
 running as `~/Applications/gesture-mac.app` (built by scripts/make-app.sh,
+which also renders the icon via scripts/make-icon.py,
 log in ~/Library/Logs/gesture-mac.log); that instance shows up in the same
 pgrep and its parent is launchd, not a shell.
 
@@ -98,6 +99,9 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 - **Comments say why, docstrings say what.** Every module opens with a
   docstring naming what it owns. No commentary inside functions unless the
   line would puzzle a reader.
+- **The menu bar icon is an SF Symbol template image** (hand.raised, and
+  hand.raised.slash while disabled), never an emoji or a colored bitmap,
+  so it matches the system's own status items in light and dark.
 - No em dashes anywhere in prose or comments.
 
 ## On-disk state
