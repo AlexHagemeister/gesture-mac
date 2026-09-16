@@ -8,6 +8,8 @@ from __future__ import annotations
 import objc
 from AppKit import (
     NSApp,
+    NSApplicationActivationPolicyAccessory,
+    NSApplicationActivationPolicyProhibited,
     NSBackingStoreBuffered,
     NSMakeRect,
     NSObject,
@@ -48,6 +50,13 @@ class HudWindow:
             self._build()
         assert self._window is not None and self._view is not None
         self._view.loadRequest_(NSURLRequest.requestWithURL_(NSURL.URLWithString_(url)))
+        # A bare python process (uv run, not the bundle with LSUIElement)
+        # starts with the Prohibited policy, so macOS never activates it:
+        # the window took clicks but keystrokes went to the previous app
+        # (Alex, 2026-09-16). Accessory matches the bundle: no Dock icon,
+        # can be activated.
+        if NSApp.activationPolicy() == NSApplicationActivationPolicyProhibited:
+            NSApp.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
         self._window.makeKeyAndOrderFront_(None)
         NSApp.activateIgnoringOtherApps_(True)
 
