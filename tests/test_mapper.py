@@ -1,9 +1,10 @@
 """Hold-key bindings follow the pinch's lifetime (or start at the held
 phase with trigger "hold"); disabling releases held keys; press-key and
 click fire once on their trigger; a modifier gates a binding."""
+from gesture_mac.capture.types import LM, Landmark
 from gesture_mac.engine import GestureEngine
 from gesture_mac.gestures.builtin.pinches import IndexPinch
-from gesture_mac.gestures.builtin.poses import Fist
+from gesture_mac.gestures.builtin.poses import Fist, Point
 from gesture_mac.mapping import Mapper, MappingDocument, parse_action
 from gesture_mac.mapping.actions import action_to_json
 from gesture_mac.mapping.bindings import Binding, Control, While, document_to_json, parse_document
@@ -29,6 +30,9 @@ class Recorder:
 
     def click(self, button, count):
         self.log.append(("click", button, count))
+
+    def move_to(self, fx, fy):
+        self.log.append(("move", round(fx, 3), round(fy, 3)))
 
 
 def doc_with_hold(hand_sel="right"):
@@ -157,6 +161,82 @@ def test_click_with_modifier_needs_the_other_hand():
     for t in range(600, 700, 10):
         engine.update(frame(t, [fist, hand(0.05)]))
     assert rec.log == [("click", "left", 1)]
+
+
+def pointing_at(x, y, handedness="left"):
+    """A left hand the classifier calls Pointing_Up, index tip at image (x, y)."""
+    h = hand(1.0, handedness=handedness)
+    h.pose_label, h.pose_score = "Pointing_Up", 0.95
+    h.landmarks[LM.INDEX_TIP] = Landmark(x, y)
+    return h
+
+
+def doc_with_pointer(mode="absolute"):
+    return MappingDocument(
+        controls=[Control("ptr", "Pointer", "action", parse_action({"type": "pointer"}))],
+        bindings=[Binding("b1", "point", "left", "ptr", mode=mode)],
+    )
+
+
+def moves(rec):
+    return [m for m in rec.log if m[0] == "move"]
+
+
+def test_pointer_maps_the_rectangle_to_the_screen():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    Mapper(engine, doc_with_pointer(), rec)
+    # Image x is mirrored: the finger at image x 0.8 is at the user's 0.2,
+    # the rectangle's left edge, so the cursor sits at the screen's left.
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [pointing_at(0.8, 0.2)]))
+    assert moves(rec)[-1] == ("move", 0.0, 0.0)
+    engine.update(frame(100, [pointing_at(0.5, 0.5)]))
+    assert moves(rec)[-1] == ("move", 0.5, 0.5)
+    engine.update(frame(110, [pointing_at(0.2, 0.8)]))
+    assert moves(rec)[-1] == ("move", 1.0, 1.0)
+
+
+def test_pointer_clamps_outside_the_rectangle_and_stops_on_release():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    Mapper(engine, doc_with_pointer(), rec)
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [pointing_at(0.95, 0.05)]))
+    assert moves(rec)[-1] == ("move", 0.0, 0.0)
+    n = len(moves(rec))
+    engine.update(frame(100, [hand(0.0, handedness="left")]))
+    engine.update(frame(110, [hand(0.0, 0.1, handedness="left")]))
+    assert len(moves(rec)) == n
+
+
+def test_pointer_uses_the_raw_position_not_the_filtered_one():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    Mapper(engine, doc_with_pointer(), rec)
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [pointing_at(0.5, 0.5)]))
+    # A sudden jump lands exactly where the finger is on the very next
+    # frame; a filtered position would lag behind it.
+    engine.update(frame(100, [pointing_at(0.35, 0.35)]))
+    assert moves(rec)[-1] == ("move", 0.75, 0.25)
+
+
+def test_pointer_in_relative_mode_does_nothing_yet():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    Mapper(engine, doc_with_pointer(mode="relative"), rec)
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [pointing_at(0.5, 0.5)]))
+    assert moves(rec) == []
+
+
+def test_pointer_action_round_trips_and_rejects_a_bad_rectangle():
+    import pytest
+
+    assert action_to_json(parse_action({"type": "pointer"})) == {"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8}
+    with pytest.raises(ValueError):
+        parse_action({"type": "pointer", "left": 0.9, "right": 0.1})
 
 
 def test_click_action_round_trips_and_rejects_bad_values():

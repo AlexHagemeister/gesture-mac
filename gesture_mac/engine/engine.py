@@ -56,6 +56,9 @@ class GestureEngine(Emitter):
         # The video is a selfie view, so image-right is the user's left.
         # mirrored=True flips axes into user space once, here.
         self._mirror = -1 if mirrored else 1
+        self.mirrored = mirrored
+        """Whether a raw anchor's image x reads right to left for the user
+        (the mapper's pointer needs to undo it without a filter)."""
         self._flick_distance = flick_distance
         self._flick_max_ms = flick_max_ms
         self._filter_opts = filter_opts or {}

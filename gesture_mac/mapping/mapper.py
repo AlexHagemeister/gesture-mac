@@ -8,7 +8,7 @@ from typing import Protocol
 
 from ..engine.engine import GestureEngine
 from ..engine.events import DeltaEvent, GestureEvent
-from .actions import Click, HoldKey, PressKey, Scroll
+from .actions import Click, HoldKey, Pointer, PressKey, Scroll
 from .bindings import Binding, MappingDocument, Trigger
 
 
@@ -18,6 +18,10 @@ class Performer(Protocol):
     def key_press(self, chord: str) -> None: ...
     def scroll(self, dx: float, dy: float) -> None: ...
     def click(self, button: str, count: int) -> None: ...
+    def move_to(self, fx: float, fy: float) -> None:
+        """Put the cursor at a fraction of the main display, 0..1 from its
+        top left."""
+        ...
 
 
 class Mapper:
@@ -95,7 +99,13 @@ class Mapper:
             return
         for b in self._matching(e.gesture_id, e.hand):
             c = self.doc.control(b.control_id)
-            if c is None or not isinstance(c.action, Scroll):
+            if c is None:
+                continue
+            if isinstance(c.action, Pointer):
+                if b.mode == "absolute":
+                    self._point_absolute(c.action, e)
+                continue
+            if not isinstance(c.action, Scroll):
                 continue
             a = c.action
             sign = -1 if (a.invert != b.invert) else 1
@@ -106,3 +116,15 @@ class Mapper:
                 self.performer.scroll(0, amount)
             else:
                 self.performer.scroll(amount, 0)
+
+    def _point_absolute(self, a: Pointer, e: DeltaEvent) -> None:
+        # The raw anchor is the unfiltered image position; user space is
+        # the mirror of it, and image y already grows downward like the
+        # screen's. Clamp to the rectangle so the cursor reaches the
+        # display's edges and stops there.
+        x, y = e.raw
+        if self.engine.mirrored:
+            x = 1 - x
+        fx = (x - a.left) / (a.right - a.left)
+        fy = (y - a.top) / (a.bottom - a.top)
+        self.performer.move_to(min(max(fx, 0.0), 1.0), min(max(fy, 0.0), 1.0))
