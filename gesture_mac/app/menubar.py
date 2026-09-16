@@ -22,6 +22,7 @@ class GestureMacApp(rumps.App):
     def __init__(self) -> None:
         super().__init__("gesture-mac", title=ICON_ON, quit_button=None)
         self.cfg: Config = load_config()
+        self._pending_status: str | None = None
         self.runtime = Runtime(self.cfg, on_status=self._status)
 
         self.enabled_item = rumps.MenuItem("Gestures enabled", callback=self.toggle_enabled)
@@ -50,6 +51,16 @@ class GestureMacApp(rumps.App):
     def _start_runtime(self, timer: rumps.Timer) -> None:
         timer.stop()
         self.runtime.start()
+        # Menu items may only change on the main thread (AppKit crashes if a
+        # worker touches them while the menu is open), so the capture thread
+        # leaves text here and this timer applies it.
+        self._status_timer = rumps.Timer(self._flush_status, 0.5)
+        self._status_timer.start()
+
+    def _flush_status(self, _timer: rumps.Timer) -> None:
+        text, self._pending_status = self._pending_status, None
+        if text is not None:
+            self.status_item.title = text
 
     # ---- menu callbacks --------------------------------------------------
 
@@ -96,7 +107,8 @@ class GestureMacApp(rumps.App):
     # ---- status ---------------------------------------------------------
 
     def _status(self, text: str) -> None:
-        self.status_item.title = text
+        """Safe from any thread: stores the text for _flush_status."""
+        self._pending_status = text
         log.info("status: %s", text)
 
     def _apply_icon(self) -> None:
