@@ -118,6 +118,8 @@ class Runtime:
         camera: Camera | None = None
         last_hand_t = time.monotonic()
         frames, report_t = 0, time.monotonic()
+        track_s = 0.0
+        """Tracking time summed over the report window, for the status line."""
         try:
             while not self._stop.is_set():
                 if not self.camera_ok:
@@ -161,7 +163,9 @@ class Runtime:
                 bgr = camera.read(1.0 / max(rate, 0.5))
                 if bgr is None:
                     continue
+                t0 = time.monotonic()
                 frame = tracker.track(bgr)
+                track_s += time.monotonic() - t0
                 if frame.hands:
                     last_hand_t = time.monotonic()
                 self.last_frame = frame
@@ -171,8 +175,11 @@ class Runtime:
                 frames += 1
                 if time.monotonic() - report_t >= 2.0:
                     fps = frames / (time.monotonic() - report_t)
-                    self.on_status(f"{fps:.0f} fps, {len(frame.hands)} hand(s){', idle' if idle else ''}")
-                    frames, report_t = 0, time.monotonic()
+                    # Tracking time per frame is the loop's ceiling: past one
+                    # camera period (33 ms at 30) a frame gets dropped.
+                    ms = 1000 * track_s / frames
+                    self.on_status(f"{fps:.0f} fps, {ms:.0f} ms track, {len(frame.hands)} hand(s){', idle' if idle else ''}")
+                    frames, report_t, track_s = 0, time.monotonic(), 0.0
         finally:
             if camera is not None:
                 camera.release()
