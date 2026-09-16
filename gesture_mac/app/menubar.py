@@ -12,6 +12,7 @@ import subprocess
 
 import rumps
 from AppKit import NSImage, NSImageSymbolConfiguration, NSImageSymbolScaleMedium
+from Foundation import NSRunLoop, NSRunLoopCommonModes
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +75,11 @@ class GestureMacApp(rumps.App):
         # leaves text here and this timer applies it.
         self._status_timer = rumps.Timer(self._flush_status, 0.5)
         self._status_timer.start()
+        # rumps schedules its NSTimer in the default run-loop mode only, and
+        # an open menu runs the loop in event-tracking mode, so the status
+        # line froze at whatever it said when the menu opened (Alex,
+        # 2026-09-16). Common modes include tracking, so it updates live.
+        NSRunLoop.currentRunLoop().addTimer_forMode_(self._status_timer._nstimer, NSRunLoopCommonModes)
 
     def _flush_status(self, _timer: rumps.Timer) -> None:
         text, self._pending_status = self._pending_status, None
