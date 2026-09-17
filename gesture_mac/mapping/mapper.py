@@ -144,10 +144,11 @@ class Mapper:
     def _point_relative(self, a: Pointer, e: DeltaEvent) -> None:
         # Trackpad feel: the first event after engage only records where
         # the finger is, so engaging never jumps the cursor. Each later
-        # event moves it by the raw anchor's travel since the previous
-        # one, in user space, scaled by the gain. Raw rather than the
-        # engine's filtered step for the same reason as absolute mode.
-        x, y = e.raw
+        # event moves it by the anchor's travel since the previous one,
+        # in user space, scaled by the gain. The engine's One Euro
+        # filtered anchor rather than the raw one: the raw baseline was
+        # felt in round 1 ("a little jittery") and smoothing is now wanted.
+        x, y = e.filtered
         if self.engine.mirrored:
             x = 1 - x
         key = (e.gesture_id, e.hand)

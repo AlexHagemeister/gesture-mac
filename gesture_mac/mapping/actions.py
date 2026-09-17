@@ -69,8 +69,9 @@ class Pointer:
     to the whole main display. Relative: the cursor moves from wherever it
     is by the anchor's travel across the frame times gain, in screen
     widths per frame width (gain 1: crossing the whole frame crosses the
-    whole screen; gain 2: half the frame does). Both use the raw
-    unfiltered anchor: no smoothing in these slices (issues #9 and #10)."""
+    whole screen; gain 2: half the frame does). Absolute uses the raw
+    unfiltered anchor (issue #9's baseline); relative uses the engine's
+    filtered one, since the raw feel was jittery (issue #10, round 1)."""
 
     left: float = 0.2
     top: float = 0.2

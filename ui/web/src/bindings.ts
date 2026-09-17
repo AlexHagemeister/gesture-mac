@@ -330,7 +330,7 @@ export class Bindings {
           labeled("Clicks", select([["1", "single"], ["2", "double"]], String(a.count), (v) => setAction({ ...a, count: v === "2" ? 2 : 1 }))),
         );
         const p = el("p", "hint");
-        p.textContent = "Clicks wherever the cursor is. Moving it is the pointer's job (not built yet).";
+        p.textContent = "Clicks wherever the cursor is. Moving it is a pointer binding's job.";
         asec.append(crow, p);
       } else if (a.type === "pointer") {
         const relative = b.mode === "relative";
@@ -342,7 +342,7 @@ export class Bindings {
           // explanation both as a tooltip on the label and as fixed text.
           mrow.append(labeled("Gain", numberInput(a.gain ?? 1, 0.1, 20, 0.1, (v) => setAction({ ...a, gain: v })), GAIN_HELP));
           p.textContent = "Engage, move, release, reposition, like a trackpad: the cursor starts from wherever it is and moves by your finger's travel times the gain. "
-            + "Gain 1 means the whole camera view is one screen width; raise it for speed, lower it for precision. Raw fingertip position, no smoothing.";
+            + "Gain 1 means the whole camera view is one screen width; raise it for speed, lower it for precision. Smoothed fingertip position.";
           asec.append(mrow, p);
         } else {
           const rrow = el("div", "row");
