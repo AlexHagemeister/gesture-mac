@@ -241,8 +241,8 @@ def test_pointer_follows_the_filtered_position():
     for t in range(100, 1600, 10):
         engine.update(frame(t, [pointing_at(0.35, 0.35)]))
     first = moves(rec)[10]
-    assert 0.5 < first[1] < 0.75 and 0.5 > first[2] > 0.25
-    assert settled(rec) == (0.75, 0.25)
+    assert 0.5 < first[1] < 0.8 and 0.5 > first[2] > 0.2
+    assert settled(rec) == (0.8, 0.2)
 
 
 def test_relative_pointer_moves_by_the_fingers_travel_not_its_position():
@@ -312,19 +312,68 @@ def test_absolute_and_relative_pointers_work_in_the_same_session():
     assert moves(rec)[-1] == ("move", 0.5, 0.5) and steps(rec) == []
     for t in range(100, 1600, 10):
         engine.update(frame(t, [pointing_at(0.35, 0.5, "left"), pointing_at(0.4, 0.5, "right")]))
-    assert moves(rec)[-1] == ("move", 0.75, 0.5)
+    assert moves(rec)[-1] == ("move", 0.8, 0.5)
     assert travel(rec) == (0.2, 0.0)
 
 
-def test_pointer_action_round_trips_and_rejects_a_bad_rectangle():
+def test_pointer_action_round_trips_and_rejects_bad_values():
     import pytest
 
-    assert action_to_json(parse_action({"type": "pointer"})) == {"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8, "gain": 2.0}
-    assert parse_action({"type": "pointer", "gain": 2.5}).gain == 2.5
+    assert action_to_json(parse_action({"type": "pointer"})) == {"type": "pointer", "gain": 2.0, "centerX": 0.5, "centerY": 0.5}
+    p = parse_action({"type": "pointer", "gain": 2.5, "centerX": 0.5, "centerY": 0.4})
+    assert (p.gain, p.center_x, p.center_y) == (2.5, 0.5, 0.4)
     with pytest.raises(ValueError):
         parse_action({"type": "pointer", "gain": 0})
     with pytest.raises(ValueError):
+        parse_action({"type": "pointer", "centerX": 1.5})
+
+
+def test_pointer_region_follows_gain_and_center_and_stays_in_the_frame():
+    def region(**kw):
+        return tuple(round(v, 3) for v in parse_action({"type": "pointer", **kw}).region())
+
+    assert region(gain=1, centerX=0.5, centerY=0.5) == (0.0, 0.0, 1.0, 1.0)
+    assert region(gain=2, centerX=0.5, centerY=0.5) == (0.25, 0.25, 0.75, 0.75)
+    # A raised center moves the region up: the screen's bottom is reached
+    # with the finger at 0.65 of the frame instead of 0.75.
+    assert region(gain=2, centerX=0.5, centerY=0.4) == (0.25, 0.15, 0.75, 0.65)
+    # Too close to an edge for the gain: the region is held inside.
+    assert region(gain=2, centerX=0.1, centerY=0.95) == (0.0, 0.5, 0.5, 1.0)
+    # Below 1 would need more than the frame, so it is the whole frame.
+    assert region(gain=0.5) == (0.0, 0.0, 1.0, 1.0)
+
+
+def test_pointer_from_a_pre_20_document_points_the_same_way():
+    # Edges that were tuned (Alex's live file: bottom raised) give the
+    # center from their midpoint and the gain from their width; the stale
+    # saved gain is ignored.
+    p = parse_action({"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.6, "gain": 1.0})
+    assert (round(p.gain, 3), p.center_x, p.center_y) == (1.667, 0.5, 0.4)
+    left, top, right, bottom = p.region()
+    assert (round(left, 2), round(right, 2)) == (0.2, 0.8) and round(bottom - top, 2) == 0.6
+    # Untouched default edges with a tuned gain (issue #10's relative
+    # bindings) keep that gain.
+    p = parse_action({"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8, "gain": 3.0})
+    assert (p.gain, p.center_x, p.center_y) == (3.0, 0.5, 0.5)
+    # No gain at all (before issue #10): the region's width is the gain.
+    p = parse_action({"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8})
+    assert (round(p.gain, 3), p.center_x, p.center_y) == (1.667, 0.5, 0.5)
+    import pytest
+    with pytest.raises(ValueError):
         parse_action({"type": "pointer", "left": 0.9, "right": 0.1})
+
+
+def test_pointer_center_moves_where_the_finger_reaches_the_screen_bottom():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    doc = MappingDocument(
+        controls=[Control("ptr", "Pointer", "action", parse_action({"type": "pointer", "gain": 2, "centerX": 0.5, "centerY": 0.4}))],
+        bindings=[Binding("b1", "point", "left", "ptr", mode="absolute")],
+    )
+    Mapper(engine, doc, rec)
+    for t in range(0, 1500, 10):
+        engine.update(frame(t, [pointing_at(0.5, 0.65)]))
+    assert settled(rec) == (0.5, 1.0)
 
 
 def test_click_action_round_trips_and_rejects_bad_values():
