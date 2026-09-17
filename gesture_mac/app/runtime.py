@@ -2,7 +2,9 @@
 performer, and runs the loop: read frame -> track -> engine.update, at
 cfg.fps while a hand is in view and cfg.idle_fps otherwise. While gestures
 are disabled the camera is released, so another app (a video call) can
-have it; enabling reopens it.
+have it; enabling reopens it. A tracker fault mid-stream is TrackerGuard's
+to recover from; when it gives up the loop parks like the disabled state,
+camera released, until the master switch is flipped.
 
 The menu bar talks to it through set_enabled(), set_camera(), reload_mappings(),
 and stop(). The HUD server reads last_frame and last_bgr (kept only while
@@ -29,6 +31,7 @@ from ..gestures import GestureThresholds, default_gestures
 from ..mapping import Mapper, load_document
 from ..output import MacPerformer, accessibility_trusted
 from .config import Config, ensure_mappings
+from .tracking import TrackerGuard
 
 log = logging.getLogger(__name__)
 
@@ -113,12 +116,15 @@ class Runtime:
 
     # ---- the loop --------------------------------------------------------
 
-    def _run(self) -> None:
-        tracker = Tracker(
+    def _build_tracker(self) -> Tracker:
+        return Tracker(
             flip_handedness=self.cfg.flip_handedness,
             hand_confidence=self.cfg.hand_confidence,
             min_in_frame=self.cfg.min_in_frame,
         )
+
+    def _run(self) -> None:
+        tracker = TrackerGuard(self._build_tracker, on_failure=self.mapper.release_all)
         camera: Camera | None = None
         last_hand_t = time.monotonic()
         frames, report_t = 0, time.monotonic()
@@ -132,14 +138,20 @@ class Runtime:
                         self.on_status("camera permission denied (System Settings > Privacy & Security > Camera)")
                         time.sleep(5)
                         continue
-                if not self.cfg.enabled:
+                if not self.cfg.enabled or tracker.stopped is not None:
                     if camera is not None:
                         camera.release()
                         camera = None
                         self.last_frame = None
                         self.last_bgr = None
-                        self.on_status("off, camera released")
-                    self._wake.wait(0.5)
+                        if tracker.stopped is not None:
+                            self.on_status(f"tracking stopped: {tracker.stopped} (switch off and on to retry)")
+                        else:
+                            self.on_status("off, camera released")
+                    # The switch clears a stop: set_enabled wakes the loop,
+                    # and a wake while enabled is the "on" flip.
+                    if self._wake.wait(0.5) and self.cfg.enabled and tracker.stopped is not None:
+                        tracker.reset()
                     self._wake.clear()
                     continue
                 if camera is None or self._camera_change.is_set():
@@ -170,6 +182,8 @@ class Runtime:
                 t0 = time.monotonic()
                 frame = tracker.track(bgr)
                 track_s += time.monotonic() - t0
+                if frame is None:
+                    continue
                 if frame.hands:
                     last_hand_t = time.monotonic()
                 self.last_frame = frame
