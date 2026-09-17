@@ -16,7 +16,7 @@ export type Action =
   | { type: "press-key"; key: string }
   | { type: "scroll"; axis: ScrollAxis; sensitivity: number; invert: boolean }
   | { type: "click"; button: MouseButton; count: 1 | 2 }
-  | { type: "pointer"; left: number; top: number; right: number; bottom: number; gain: number };
+  | { type: "pointer"; gain: number; offsetX: number; offsetY: number };
 export type ActionType = Action["type"];
 
 export interface Control {
@@ -109,6 +109,28 @@ export interface MappingsMsg { type: "mappings"; mappings: MappingDocument }
 export interface ThresholdsMsg { type: "thresholds"; gestureId: string; thresholds: Thresholds }
 
 export type Msg = FrameMsg | GestureMsg | DeltaMsg | MappingsMsg | ThresholdsMsg;
+
+/** The selected absolute pointer binding's region, for the HUD to draw:
+ * edges as fractions of the mirrored view from its top left (user space,
+ * the same as gesture_mac/mapping/actions.py Pointer.region()). */
+export interface PointerRegion {
+  gestureId: string;
+  hand: HandSelector;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** Pointer.region() from actions.py, kept in step by hand: 1/gain of the
+ * view around the middle, moved by the offsets (positive right and up),
+ * slid inward so it never leaves the view. */
+export function pointerRegion(gain: number, offsetX: number, offsetY: number): [number, number, number, number] {
+  const half = 0.5 / Math.max(gain, 1);
+  const cx = Math.min(Math.max(0.5 + offsetX, half), 1 - half);
+  const cy = Math.min(Math.max(0.5 - offsetY, half), 1 - half);
+  return [cx - half, cy - half, cx + half, cy + half];
+}
 
 /** True when a binding's hand selector covers an event's hand key. */
 export function handMatches(selector: HandSelector, hand: HandKey): boolean {

@@ -137,8 +137,9 @@ class Mapper:
         x, y = e.filtered
         if self.engine.mirrored:
             x = 1 - x
-        fx = (x - a.left) / (a.right - a.left)
-        fy = (y - a.top) / (a.bottom - a.top)
+        left, top, right, bottom = a.region()
+        fx = (x - left) / (right - left)
+        fy = (y - top) / (bottom - top)
         self.performer.move_to(min(max(fx, 0.0), 1.0), min(max(fy, 0.0), 1.0))
 
     def _point_relative(self, a: Pointer, e: DeltaEvent) -> None:

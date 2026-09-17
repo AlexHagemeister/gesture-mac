@@ -7,10 +7,13 @@
  * from a local engine, and the landmark drawing is our own twenty lines
  * so the page does not ship MediaPipe just to draw a skeleton. Gesture
  * scores are not drawn here: live.ts lists them beside the video, where
- * text is legible over any background.
+ * text is legible over any background. The selected absolute pointer
+ * binding's region is drawn as a rectangle (asked of the page through
+ * `region`), lit while that gesture's fingertip is inside it.
  */
 import type { Remote } from "./remote";
-import type { DeltaMsg, FrameMsg, HandInfo } from "./types";
+import type { DeltaMsg, FrameMsg, HandInfo, PointerRegion } from "./types";
+import { handMatches } from "./types";
 
 const COLORS = { left: "#4cc9f0", right: "#f72585", both: "#ffd166" } as const;
 
@@ -33,6 +36,8 @@ export class Hud {
   private frames = 0;
   private fpsAt = performance.now();
   fps = 0;
+  /** Set by the page: the region to draw this frame, or null for none. */
+  region: () => PointerRegion | null = () => null;
 
   constructor(remote: Remote, mount: HTMLElement) {
     this.remote = remote;
@@ -74,7 +79,32 @@ export class Hud {
     // CSS alongside the image, so we draw unflipped and let CSS flip both.
     for (const hand of frame.hands) this.drawHand(hand);
     for (const d of this.lastDeltas.values()) this.drawDrag(d);
+    const region = this.region();
+    if (region) this.drawRegion(region);
+  }
 
+  private drawRegion(r: PointerRegion): void {
+    const { ctx, canvas } = this;
+    // The region is in the mirrored view (user space); the canvas is raw
+    // image space and CSS flips it, so its x runs the other way.
+    const x0 = (1 - r.right) * canvas.width, x1 = (1 - r.left) * canvas.width;
+    const y0 = r.top * canvas.height, y1 = r.bottom * canvas.height;
+    const tips = [...this.lastDeltas.values()].filter((d) => d.gestureId === r.gestureId && handMatches(r.hand, d.hand));
+    const inside = tips.some((d) => d.filtered[0] >= 1 - r.right && d.filtered[0] <= 1 - r.left && d.filtered[1] >= r.top && d.filtered[1] <= r.bottom);
+    ctx.save();
+    ctx.strokeStyle = inside ? "#ffd166" : "rgba(255, 255, 255, 0.6)";
+    ctx.lineWidth = inside ? 4 : 2;
+    ctx.setLineDash(inside ? [] : [12, 8]);
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.restore();
+    for (const d of tips) {
+      const [fx, fy] = [d.filtered[0] * canvas.width, d.filtered[1] * canvas.height];
+      ctx.strokeStyle = inside ? "#ffd166" : "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(fx, fy, 14, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   private drawHand(hand: HandInfo): void {

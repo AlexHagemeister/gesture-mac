@@ -13,13 +13,13 @@
  */
 import { recordChord, type Recording } from "./keys";
 import type { Remote } from "./remote";
-import { handMatches, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type ScrollAxis, type Thresholds, type Trigger } from "./types";
+import { handMatches, pointerRegion, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type PointerRegion, type ScrollAxis, type Thresholds, type Trigger } from "./types";
 
 const SINGLE_HANDS: Array<[HandSelector, string]> = [["either", "either hand"], ["left", "left hand"], ["right", "right hand"]];
 const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"], ["click", "click the mouse"], ["pointer", "move the pointer"]];
 const BUTTONS: Array<[MouseButton, string]> = [["left", "left button"], ["right", "right button"], ["middle", "middle button"]];
 const CLICK: Action = { type: "click", button: "left", count: 1 };
-const POINTER: Action = { type: "pointer", left: 0.2, top: 0.2, right: 0.8, bottom: 0.8, gain: 2 };
+const POINTER: Action = { type: "pointer", gain: 2, offsetX: 0, offsetY: 0 };
 const POINTER_MODES: Array<[PointerMode, string]> = [
   ["absolute", "absolute (finger position is cursor position)"],
   ["relative", "relative (trackpad: finger motion moves the cursor)"],
@@ -27,6 +27,11 @@ const POINTER_MODES: Array<[PointerMode, string]> = [
 const GAIN_HELP = "How far the cursor travels for a given finger travel, in screen widths per camera-frame width. "
   + "1: moving your finger across the whole camera view moves the cursor across the whole screen. "
   + "2: half the view does it (faster, coarser). 0.5: it takes two passes (slower, finer).";
+const ABS_GAIN_HELP = "How much of the camera view covers the screen: 1 is the whole view, 2 the middle half, 3 the middle third. "
+  + "Higher means smaller hand moves (and more visible jitter).";
+const OFFSET_X_HELP = "Slides the active region left or right, as a fraction of the view. 0 is centered; positive is to your right, negative to your left.";
+const OFFSET_Y_HELP = "Slides the active region up or down, as a fraction of the view. 0 is centered; positive is up, negative is down. "
+  + "Raise it so the bottom of the screen is reached before your hand drops out of view.";
 const PRESS_TRIGGERS: Array<[Trigger, string]> = [
   ["engage", "on engage"], ["hold", "after held"], ["release", "on release"],
   ["flick-left", "flick left"], ["flick-right", "flick right"], ["flick-up", "flick up"], ["flick-down", "flick down"],
@@ -111,6 +116,16 @@ export class Bindings {
 
   private control(id: string): Control | undefined {
     return this.remote.doc.controls.find((c) => c.id === id);
+  }
+
+  /** The region the selected binding maps to the screen, when it is an
+   * absolute pointer; the HUD draws it over the video. */
+  pointerRegion(): PointerRegion | null {
+    const sel = this.selected();
+    const a = sel?.control?.action;
+    if (!sel || !a || a.type !== "pointer" || sel.binding.mode === "relative") return null;
+    const [left, top, right, bottom] = pointerRegion(a.gain ?? 2, a.offsetX ?? 0, a.offsetY ?? 0);
+    return { gestureId: sel.binding.gestureId, hand: sel.binding.hand, left, top, right, bottom };
   }
 
   private selected(): { binding: Binding; control: Control | undefined; draft: boolean } | null {
@@ -345,12 +360,15 @@ export class Bindings {
             + "Gain 1 means the whole camera view is one screen width; raise it for speed, lower it for precision. Smoothed fingertip position.";
           asec.append(mrow, p);
         } else {
-          const rrow = el("div", "row");
-          const edge = (key: "left" | "top" | "right" | "bottom", label: string) =>
-            labeled(label, numberInput(a[key], 0, 1, 0.05, (v) => setAction({ ...a, [key]: v })));
-          rrow.append(edge("left", "Left edge"), edge("right", "Right edge"), edge("top", "Top edge"), edge("bottom", "Bottom edge"));
-          p.textContent = "The rectangle of the camera view (fractions from the top left, as you see it mirrored) that maps to the whole screen. Smoothed fingertip position.";
-          asec.append(mrow, rrow, p);
+          mrow.append(
+            labeled("Gain", numberInput(a.gain ?? 2, 1, 10, 0.1, (v) => setAction({ ...a, gain: v })), ABS_GAIN_HELP),
+            labeled("Offset (left/right)", numberInput(a.offsetX ?? 0, -0.5, 0.5, 0.05, (v) => setAction({ ...a, offsetX: v })), OFFSET_X_HELP),
+            labeled("Offset (up/down)", numberInput(a.offsetY ?? 0, -0.5, 0.5, 0.05, (v) => setAction({ ...a, offsetY: v })), OFFSET_Y_HELP),
+          );
+          p.textContent = "The finger's position in a region of the camera view is the cursor's position on the screen. "
+            + "Gain sets the region's size (2: the middle half of the view is the whole screen). The offsets slide it from the middle: "
+            + "0 is centered, positive is right or up, negative is left or down. It is held inside the view. Smoothed fingertip position.";
+          asec.append(mrow, p);
         }
       } else {
         const srow = el("div", "row");
@@ -474,7 +492,7 @@ function summary(c: Control): string {
   if (a.type === "hold-key") return `hold ${a.key}`;
   if (a.type === "press-key") return `press ${a.key}`;
   if (a.type === "click") return `${a.count === 2 ? "double-click" : "click"} ${a.button}`;
-  if (a.type === "pointer") return `move the pointer (${a.left}–${a.right} × ${a.top}–${a.bottom}, gain ${a.gain ?? 2})`;
+  if (a.type === "pointer") return `move the pointer (gain ${a.gain ?? 2}, offset ${a.offsetX ?? 0} × ${a.offsetY ?? 0})`;
   return `scroll ${a.axis} ×${a.sensitivity}${a.invert ? " inverted" : ""}`;
 }
 
