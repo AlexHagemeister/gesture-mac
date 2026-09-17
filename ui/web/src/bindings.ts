@@ -13,7 +13,7 @@
  */
 import { recordChord, type Recording } from "./keys";
 import type { Remote } from "./remote";
-import { handMatches, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type ScrollAxis, type Thresholds, type Trigger } from "./types";
+import { handMatches, pointerRegion, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type PointerRegion, type ScrollAxis, type Thresholds, type Trigger } from "./types";
 
 const SINGLE_HANDS: Array<[HandSelector, string]> = [["either", "either hand"], ["left", "left hand"], ["right", "right hand"]];
 const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"], ["click", "click the mouse"], ["pointer", "move the pointer"]];
@@ -116,6 +116,16 @@ export class Bindings {
 
   private control(id: string): Control | undefined {
     return this.remote.doc.controls.find((c) => c.id === id);
+  }
+
+  /** The region the selected binding maps to the screen, when it is an
+   * absolute pointer; the HUD draws it over the video. */
+  pointerRegion(): PointerRegion | null {
+    const sel = this.selected();
+    const a = sel?.control?.action;
+    if (!sel || !a || a.type !== "pointer" || sel.binding.mode === "relative") return null;
+    const [left, top, right, bottom] = pointerRegion(a.gain ?? 2, a.offsetX ?? 0, a.offsetY ?? 0);
+    return { gestureId: sel.binding.gestureId, hand: sel.binding.hand, left, top, right, bottom };
   }
 
   private selected(): { binding: Binding; control: Control | undefined; draft: boolean } | null {

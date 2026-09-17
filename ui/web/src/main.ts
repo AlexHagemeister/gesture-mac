@@ -21,7 +21,8 @@ async function main(): Promise<void> {
   await remote.init();
   const hud = new Hud(remote, liveMount);
   new Live(remote, liveMount);
-  new Bindings(remote, listMount, detailMount);
+  const bindings = new Bindings(remote, listMount, detailMount);
+  hud.region = () => bindings.pointerRegion();
 
   let hands = 0;
   let live = false;
