@@ -7,7 +7,7 @@ JSON shape (the "action" field of a control of kind "action"):
     {"type": "press-key", "key": "cmd+shift+4"}
     {"type": "scroll",    "axis": "y", "sensitivity": 40}
     {"type": "click",     "button": "left", "count": 1}
-    {"type": "pointer",   "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8}
+    {"type": "pointer",   "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8, "gain": 2.0}
 
 Key names: a chord of "+"-joined tokens. Modifiers: cmd, shift, option/alt,
 ctrl, fn, and the sided forms right-option, left-cmd, etc. Base keys: a
@@ -63,16 +63,21 @@ class Click:
 
 @dataclass(frozen=True, slots=True)
 class Pointer:
-    """Cursor driven by a continuous gesture's anchor. In absolute mode
-    (the binding's mode field) this rectangle of the mirrored camera
+    """Cursor driven by a continuous gesture's anchor. The binding's mode
+    field picks the feel. Absolute: this rectangle of the mirrored camera
     frame, as fractions of its width and height from the top left, maps
-    to the whole main display. The position used is the raw unfiltered
-    anchor: no smoothing in this slice (issue #9 wants the raw feel)."""
+    to the whole main display. Relative: the cursor moves from wherever it
+    is by the anchor's travel across the frame times gain, in screen
+    widths per frame width (gain 1: crossing the whole frame crosses the
+    whole screen; gain 2: half the frame does). Both follow the engine's
+    One Euro filtered anchor; the raw baseline was felt first and was
+    jittery (issues #9 and #10)."""
 
     left: float = 0.2
     top: float = 0.2
     right: float = 0.8
     bottom: float = 0.8
+    gain: float = 2.0
     type: Literal["pointer"] = "pointer"
 
 
@@ -105,9 +110,12 @@ def parse_action(d: dict) -> Action:
             top=float(d.get("top", 0.2)),
             right=float(d.get("right", 0.8)),
             bottom=float(d.get("bottom", 0.8)),
+            gain=float(d.get("gain", 2.0)),
         )
         if not (0 <= p.left < p.right <= 1 and 0 <= p.top < p.bottom <= 1):
             raise ValueError("pointer rectangle edges must be within 0..1 with left < right and top < bottom")
+        if not p.gain > 0:
+            raise ValueError(f"pointer gain must be positive, not {p.gain}")
         return p
     raise ValueError(f"unknown action type: {kind!r}")
 
@@ -118,5 +126,5 @@ def action_to_json(a: Action) -> dict:
     if isinstance(a, Click):
         return {"type": a.type, "button": a.button, "count": a.count}
     if isinstance(a, Pointer):
-        return {"type": a.type, "left": a.left, "top": a.top, "right": a.right, "bottom": a.bottom}
+        return {"type": a.type, "left": a.left, "top": a.top, "right": a.right, "bottom": a.bottom, "gain": a.gain}
     return {"type": a.type, "axis": a.axis, "sensitivity": a.sensitivity, "invert": a.invert}

@@ -94,6 +94,16 @@ class MacPerformer:
         ev = Q.CGEventCreateMouseEvent(self._src, Q.kCGEventMouseMoved, where, Q.kCGMouseButtonLeft)
         Q.CGEventPost(Q.kCGHIDEventTap, ev)
 
+    def move_by(self, dx: float, dy: float) -> None:
+        # From the cursor's live position, so a relative binding continues
+        # from wherever the mouse or another binding last left it.
+        b = Q.CGDisplayBounds(Q.CGMainDisplayID())
+        here = Q.CGEventGetLocation(Q.CGEventCreate(None))
+        x = min(max(here.x + dx * b.size.width, b.origin.x), b.origin.x + b.size.width - 1)
+        y = min(max(here.y + dy * b.size.height, b.origin.y), b.origin.y + b.size.height - 1)
+        ev = Q.CGEventCreateMouseEvent(self._src, Q.kCGEventMouseMoved, (x, y), Q.kCGMouseButtonLeft)
+        Q.CGEventPost(Q.kCGHIDEventTap, ev)
+
     def click(self, button: str, count: int) -> None:
         """Click where the cursor already is. The click-state field counts
         up across the presses of a multi-click so the target sees a real
