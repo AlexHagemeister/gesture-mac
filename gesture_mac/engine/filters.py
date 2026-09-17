@@ -1,6 +1,13 @@
 """One Euro filter (Casiez et al. 2012): low lag when moving fast, low jitter
 when still. Used on continuous-gesture anchors so axes do not shiver.
 Tune min_cutoff down for less jitter, beta up for less lag.
+
+Inputs are normalized frame coordinates, so speeds are frame widths per
+second (a brisk hand is about 1), a thousand times smaller than the
+pixel speeds the paper's beta values assume. beta 20 gives a cutoff of
+about 20 Hz at that speed (near raw) while a still hand sits at
+min_cutoff; the paper's 0.02 left the cutoff at 1 Hz at every speed,
+which felt like a fixed 160 ms lag (issue #10, round 2).
 """
 from __future__ import annotations
 
@@ -20,7 +27,7 @@ class _LowPass:
 
 
 class OneEuro:
-    def __init__(self, min_cutoff: float = 1.0, beta: float = 0.02, d_cutoff: float = 1.0) -> None:
+    def __init__(self, min_cutoff: float = 1.0, beta: float = 20.0, d_cutoff: float = 1.0) -> None:
         self.min_cutoff = min_cutoff
         self.beta = beta
         self.d_cutoff = d_cutoff
