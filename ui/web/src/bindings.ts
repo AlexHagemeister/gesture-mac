@@ -19,7 +19,7 @@ const SINGLE_HANDS: Array<[HandSelector, string]> = [["either", "either hand"], 
 const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"], ["click", "click the mouse"], ["pointer", "move the pointer"]];
 const BUTTONS: Array<[MouseButton, string]> = [["left", "left button"], ["right", "right button"], ["middle", "middle button"]];
 const CLICK: Action = { type: "click", button: "left", count: 1 };
-const POINTER: Action = { type: "pointer", left: 0.2, top: 0.2, right: 0.8, bottom: 0.8, gain: 1 };
+const POINTER: Action = { type: "pointer", left: 0.2, top: 0.2, right: 0.8, bottom: 0.8, gain: 2 };
 const POINTER_MODES: Array<[PointerMode, string]> = [
   ["absolute", "absolute (finger position is cursor position)"],
   ["relative", "relative (trackpad: finger motion moves the cursor)"],
@@ -340,7 +340,7 @@ export class Bindings {
         if (relative) {
           // Gain is the only knob of the trackpad feel, so it gets its own
           // explanation both as a tooltip on the label and as fixed text.
-          mrow.append(labeled("Gain", numberInput(a.gain ?? 1, 0.1, 20, 0.1, (v) => setAction({ ...a, gain: v })), GAIN_HELP));
+          mrow.append(labeled("Gain", numberInput(a.gain ?? 2, 0.1, 20, 0.1, (v) => setAction({ ...a, gain: v })), GAIN_HELP));
           p.textContent = "Engage, move, release, reposition, like a trackpad: the cursor starts from wherever it is and moves by your finger's travel times the gain. "
             + "Gain 1 means the whole camera view is one screen width; raise it for speed, lower it for precision. Smoothed fingertip position.";
           asec.append(mrow, p);
@@ -349,7 +349,7 @@ export class Bindings {
           const edge = (key: "left" | "top" | "right" | "bottom", label: string) =>
             labeled(label, numberInput(a[key], 0, 1, 0.05, (v) => setAction({ ...a, [key]: v })));
           rrow.append(edge("left", "Left edge"), edge("right", "Right edge"), edge("top", "Top edge"), edge("bottom", "Bottom edge"));
-          p.textContent = "The rectangle of the camera view (fractions from the top left, as you see it mirrored) that maps to the whole screen. Raw fingertip position, no smoothing.";
+          p.textContent = "The rectangle of the camera view (fractions from the top left, as you see it mirrored) that maps to the whole screen. Smoothed fingertip position.";
           asec.append(mrow, rrow, p);
         }
       } else {
@@ -474,7 +474,7 @@ function summary(c: Control): string {
   if (a.type === "hold-key") return `hold ${a.key}`;
   if (a.type === "press-key") return `press ${a.key}`;
   if (a.type === "click") return `${a.count === 2 ? "double-click" : "click"} ${a.button}`;
-  if (a.type === "pointer") return `move the pointer (${a.left}–${a.right} × ${a.top}–${a.bottom}, gain ${a.gain ?? 1})`;
+  if (a.type === "pointer") return `move the pointer (${a.left}–${a.right} × ${a.top}–${a.bottom}, gain ${a.gain ?? 2})`;
   return `scroll ${a.axis} ×${a.sensitivity}${a.invert ? " inverted" : ""}`;
 }
 

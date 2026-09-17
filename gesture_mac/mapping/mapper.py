@@ -130,11 +130,11 @@ class Mapper:
                 self.performer.scroll(amount, 0)
 
     def _point_absolute(self, a: Pointer, e: DeltaEvent) -> None:
-        # The raw anchor is the unfiltered image position; user space is
-        # the mirror of it, and image y already grows downward like the
+        # The filtered anchor is in image coordinates; user space is the
+        # mirror of it, and image y already grows downward like the
         # screen's. Clamp to the rectangle so the cursor reaches the
         # display's edges and stops there.
-        x, y = e.raw
+        x, y = e.filtered
         if self.engine.mirrored:
             x = 1 - x
         fx = (x - a.left) / (a.right - a.left)
