@@ -109,7 +109,7 @@ owns; the top-level `gesture_mac/__init__.py` lists the import order.
 ## On-disk state
 
 `~/Library/Application Support/gesture-mac/config.json` (enabled, camera
-name, frame rates, hand-acceptance floors, HUD port) and `mappings.json` (seeded from
+name, frame rates, hand-acceptance floors, smoothing constants, HUD port) and `mappings.json` (seeded from
 `presets/default.json` on first run). The HUD panel writes mappings.json
 and hot-reloads; hand edits need Reload mappings in the menu.
 
@@ -123,7 +123,9 @@ token touches output/keys.py and the code table in ui/web/src/keys.ts.
 A new binding is a draft in the page until Save, because the app rejects
 a document whose key chord is empty; edits to an existing binding write
 through at once. Threshold edits from the panel are live and unsaved, the
-same as the template.
+same as the template. Smoothing edits (the sliders on a continuous
+gesture) are live and saved to config.json, because they are tuned by
+feel over time (Alex, 2026-09-16, issue #24).
 
 ## Things that are guesses until tuned with a real hand
 

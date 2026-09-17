@@ -462,7 +462,7 @@ export class Bindings {
         field("beta", "Fast moves", 0, 100, 5, "How much it loosens as the hand speeds up. Higher trails less on sweeps. 20 is already near raw at a brisk speed."),
       );
       const note = el("p", "hint");
-      note.textContent = "Higher is snappier, lower is steadier. Applies to every continuous gesture, and to a move already in progress. Live until the app restarts; not saved.";
+      note.textContent = "Higher is snappier, lower is steadier. Applies to every continuous gesture, and to a move already in progress. Saved as you go: the app starts with these next time.";
       ssec.append(grid, note);
       pane.append(ssec);
     }

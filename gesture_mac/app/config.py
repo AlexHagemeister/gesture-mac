@@ -1,14 +1,14 @@
 """On-disk settings. Everything lives under
 ~/Library/Application Support/gesture-mac/:
 
-    config.json     enabled, camera name, frame rates, HUD port
+    config.json     enabled, camera name, frame rates, smoothing, HUD port
     mappings.json   the bindings document (seeded from presets/default.json)
 """
 from __future__ import annotations
 
 import json
 import shutil
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "gesture-mac"
@@ -39,6 +39,9 @@ class Config:
     (MediaPipe default 0.5 tracked a pillow corner as a hand: issue #12)."""
     min_in_frame: float = 0.9
     """Fraction of a hand's landmarks that must be inside the image."""
+    smoothing: dict[str, float] = field(default_factory=dict)
+    """The engine's smoothing constants as last set from the panel
+    (min_cutoff, beta, d_cutoff). Empty means the engine's defaults."""
     hud_port: int = 8765
     """Local port for the HUD page. Bound to 127.0.0.1 only."""
 
