@@ -7,7 +7,7 @@ JSON shape (the "action" field of a control of kind "action"):
     {"type": "press-key", "key": "cmd+shift+4"}
     {"type": "scroll",    "axis": "y", "sensitivity": 40}
     {"type": "click",     "button": "left", "count": 1}
-    {"type": "pointer",   "gain": 2.0, "centerX": 0.5, "centerY": 0.5}
+    {"type": "pointer",   "gain": 2.0, "offsetX": 0.0, "offsetY": 0.0}
 
 Key names: a chord of "+"-joined tokens. Modifiers: cmd, shift, option/alt,
 ctrl, fn, and the sided forms right-option, left-cmd, etc. Base keys: a
@@ -66,24 +66,26 @@ class Pointer:
     """Cursor driven by a continuous gesture's anchor. The binding's mode
     field picks the feel; gain means the same in both: screen widths per
     camera-frame width of finger travel. Absolute: a region of the
-    mirrored frame, 1/gain of its width and height around (center_x,
-    center_y) (fractions from the top left), maps to the whole main
-    display; region() slides it inward so it never leaves the frame.
-    Relative: the cursor moves from wherever it is by the anchor's travel
-    times gain, and the center is unused. Both follow the engine's One
-    Euro filtered anchor (issues #9, #10, #20)."""
+    mirrored frame, 1/gain of its width and height, centered in the view
+    and then moved by (offset_x, offset_y) in fractions of the view, user
+    space (0 is centered, positive is to the user's right and up), maps
+    to the whole main display; region() slides it inward so it never
+    leaves the frame. Relative: the cursor moves from wherever it is by
+    the anchor's travel times gain, and the offset is unused. Both follow
+    the engine's One Euro filtered anchor (issues #9, #10, #20)."""
 
     gain: float = 2.0
-    center_x: float = 0.5
-    center_y: float = 0.5
+    offset_x: float = 0.0
+    offset_y: float = 0.0
     type: Literal["pointer"] = "pointer"
 
     def region(self) -> tuple[float, float, float, float]:
-        """(left, top, right, bottom) of the absolute-mode region. A gain
-        below 1 would need more than the frame, so it acts as 1."""
+        """(left, top, right, bottom) of the absolute-mode region in the
+        mirrored view, fractions from the top left. A gain below 1 would
+        need more than the frame, so it acts as 1."""
         half = 0.5 / max(self.gain, 1.0)
-        cx = min(max(self.center_x, half), 1 - half)
-        cy = min(max(self.center_y, half), 1 - half)
+        cx = min(max(0.5 + self.offset_x, half), 1 - half)
+        cy = min(max(0.5 - self.offset_y, half), 1 - half)
         return (cx - half, cy - half, cx + half, cy + half)
 
 Action = Union[HoldKey, PressKey, Scroll, Click, Pointer]
@@ -110,26 +112,34 @@ def parse_action(d: dict) -> Action:
             raise ValueError(f"click count must be 1 or 2, not {count}")
         return Click(button=button, count=count)
     if kind == "pointer":
-        legacy = "centerX" not in d and any(k in d for k in ("left", "top", "right", "bottom"))
-        if not legacy:
+        if any(k in d for k in ("left", "top", "right", "bottom")):
+            p = _pointer_from_edges(d)
+        elif "centerX" in d or "centerY" in d:
+            # Issue #20's first round stored the center as fractions from
+            # the top left.
             p = Pointer(
                 gain=float(d.get("gain", 2.0)),
-                center_x=float(d.get("centerX", 0.5)),
-                center_y=float(d.get("centerY", 0.5)),
+                offset_x=float(d.get("centerX", 0.5)) - 0.5,
+                offset_y=0.5 - float(d.get("centerY", 0.5)),
             )
         else:
-            p = _pointer_from_edges(d)
+            p = Pointer(
+                gain=float(d.get("gain", 2.0)),
+                offset_x=float(d.get("offsetX", 0.0)),
+                offset_y=float(d.get("offsetY", 0.0)),
+            )
         if not p.gain > 0:
             raise ValueError(f"pointer gain must be positive, not {p.gain}")
-        if not (0 <= p.center_x <= 1 and 0 <= p.center_y <= 1):
-            raise ValueError("pointer center must be within 0..1")
+        if not (-0.5 <= p.offset_x <= 0.5 and -0.5 <= p.offset_y <= 0.5):
+            raise ValueError("pointer offset must be within -0.5..0.5")
         return p
     raise ValueError(f"unknown action type: {kind!r}")
 
 
 def _pointer_from_edges(d: dict) -> Pointer:
     """A document from before issue #20 describes the region as four edges.
-    The center is their midpoint. The gain comes from the region's width,
+    The offset is their midpoint's distance from the middle of the view.
+    The gain comes from the region's width,
     except when the edges are the untouched old defaults and a gain was
     saved (tuned for relative mode in issue #10), which is then kept."""
     left, top = float(d.get("left", 0.2)), float(d.get("top", 0.2))
@@ -138,7 +148,7 @@ def _pointer_from_edges(d: dict) -> Pointer:
         raise ValueError("pointer rectangle edges must be within 0..1 with left < right and top < bottom")
     untouched = (left, top, right, bottom) == (0.2, 0.2, 0.8, 0.8)
     gain = float(d["gain"]) if untouched and "gain" in d else 1 / (right - left)
-    return Pointer(gain=gain, center_x=(left + right) / 2, center_y=(top + bottom) / 2)
+    return Pointer(gain=gain, offset_x=(left + right) / 2 - 0.5, offset_y=0.5 - (top + bottom) / 2)
 
 
 def action_to_json(a: Action) -> dict:
@@ -147,5 +157,5 @@ def action_to_json(a: Action) -> dict:
     if isinstance(a, Click):
         return {"type": a.type, "button": a.button, "count": a.count}
     if isinstance(a, Pointer):
-        return {"type": a.type, "gain": a.gain, "centerX": a.center_x, "centerY": a.center_y}
+        return {"type": a.type, "gain": a.gain, "offsetX": a.offset_x, "offsetY": a.offset_y}
     return {"type": a.type, "axis": a.axis, "sensitivity": a.sensitivity, "invert": a.invert}

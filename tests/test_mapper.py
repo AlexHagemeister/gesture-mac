@@ -319,26 +319,31 @@ def test_absolute_and_relative_pointers_work_in_the_same_session():
 def test_pointer_action_round_trips_and_rejects_bad_values():
     import pytest
 
-    assert action_to_json(parse_action({"type": "pointer"})) == {"type": "pointer", "gain": 2.0, "centerX": 0.5, "centerY": 0.5}
-    p = parse_action({"type": "pointer", "gain": 2.5, "centerX": 0.5, "centerY": 0.4})
-    assert (p.gain, p.center_x, p.center_y) == (2.5, 0.5, 0.4)
+    assert action_to_json(parse_action({"type": "pointer"})) == {"type": "pointer", "gain": 2.0, "offsetX": 0.0, "offsetY": 0.0}
+    p = parse_action({"type": "pointer", "gain": 2.5, "offsetX": 0.0, "offsetY": 0.1})
+    assert (p.gain, p.offset_x, p.offset_y) == (2.5, 0.0, 0.1)
+    # Round 1 of issue #20 stored a center from the top left instead.
+    p = parse_action({"type": "pointer", "gain": 2.0, "centerX": 0.5, "centerY": 0.4})
+    assert (p.gain, p.offset_x, round(p.offset_y, 3)) == (2.0, 0.0, 0.1)
     with pytest.raises(ValueError):
         parse_action({"type": "pointer", "gain": 0})
     with pytest.raises(ValueError):
-        parse_action({"type": "pointer", "centerX": 1.5})
+        parse_action({"type": "pointer", "offsetX": 0.7})
 
 
 def test_pointer_region_follows_gain_and_center_and_stays_in_the_frame():
     def region(**kw):
         return tuple(round(v, 3) for v in parse_action({"type": "pointer", **kw}).region())
 
-    assert region(gain=1, centerX=0.5, centerY=0.5) == (0.0, 0.0, 1.0, 1.0)
-    assert region(gain=2, centerX=0.5, centerY=0.5) == (0.25, 0.25, 0.75, 0.75)
-    # A raised center moves the region up: the screen's bottom is reached
-    # with the finger at 0.65 of the frame instead of 0.75.
-    assert region(gain=2, centerX=0.5, centerY=0.4) == (0.25, 0.15, 0.75, 0.65)
-    # Too close to an edge for the gain: the region is held inside.
-    assert region(gain=2, centerX=0.1, centerY=0.95) == (0.0, 0.5, 0.5, 1.0)
+    assert region(gain=1) == (0.0, 0.0, 1.0, 1.0)
+    assert region(gain=2) == (0.25, 0.25, 0.75, 0.75)
+    # A positive up/down offset moves the region up: the screen's bottom
+    # is reached with the finger at 0.65 of the frame instead of 0.75.
+    assert region(gain=2, offsetY=0.1) == (0.25, 0.15, 0.75, 0.65)
+    # Positive across is the user's right in the mirrored view.
+    assert region(gain=2, offsetX=0.1) == (0.35, 0.25, 0.85, 0.75)
+    # Too far for the gain: the region is held inside the view.
+    assert region(gain=2, offsetX=-0.4, offsetY=-0.45) == (0.0, 0.5, 0.5, 1.0)
     # Below 1 would need more than the frame, so it is the whole frame.
     assert region(gain=0.5) == (0.0, 0.0, 1.0, 1.0)
 
@@ -348,26 +353,26 @@ def test_pointer_from_a_pre_20_document_points_the_same_way():
     # center from their midpoint and the gain from their width; the stale
     # saved gain is ignored.
     p = parse_action({"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.6, "gain": 1.0})
-    assert (round(p.gain, 3), p.center_x, p.center_y) == (1.667, 0.5, 0.4)
+    assert (round(p.gain, 3), p.offset_x, round(p.offset_y, 3)) == (1.667, 0.0, 0.1)
     left, top, right, bottom = p.region()
     assert (round(left, 2), round(right, 2)) == (0.2, 0.8) and round(bottom - top, 2) == 0.6
     # Untouched default edges with a tuned gain (issue #10's relative
     # bindings) keep that gain.
     p = parse_action({"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8, "gain": 3.0})
-    assert (p.gain, p.center_x, p.center_y) == (3.0, 0.5, 0.5)
+    assert (p.gain, p.offset_x, p.offset_y) == (3.0, 0.0, 0.0)
     # No gain at all (before issue #10): the region's width is the gain.
     p = parse_action({"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8})
-    assert (round(p.gain, 3), p.center_x, p.center_y) == (1.667, 0.5, 0.5)
+    assert (round(p.gain, 3), p.offset_x, p.offset_y) == (1.667, 0.0, 0.0)
     import pytest
     with pytest.raises(ValueError):
         parse_action({"type": "pointer", "left": 0.9, "right": 0.1})
 
 
-def test_pointer_center_moves_where_the_finger_reaches_the_screen_bottom():
+def test_pointer_offset_moves_where_the_finger_reaches_the_screen_bottom():
     engine = GestureEngine([Point()])
     rec = Recorder()
     doc = MappingDocument(
-        controls=[Control("ptr", "Pointer", "action", parse_action({"type": "pointer", "gain": 2, "centerX": 0.5, "centerY": 0.4}))],
+        controls=[Control("ptr", "Pointer", "action", parse_action({"type": "pointer", "gain": 2, "offsetY": 0.1}))],
         bindings=[Binding("b1", "point", "left", "ptr", mode="absolute")],
     )
     Mapper(engine, doc, rec)

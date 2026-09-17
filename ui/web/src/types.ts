@@ -16,7 +16,7 @@ export type Action =
   | { type: "press-key"; key: string }
   | { type: "scroll"; axis: ScrollAxis; sensitivity: number; invert: boolean }
   | { type: "click"; button: MouseButton; count: 1 | 2 }
-  | { type: "pointer"; gain: number; centerX: number; centerY: number };
+  | { type: "pointer"; gain: number; offsetX: number; offsetY: number };
 export type ActionType = Action["type"];
 
 export interface Control {

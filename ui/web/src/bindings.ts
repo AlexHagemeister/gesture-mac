@@ -19,7 +19,7 @@ const SINGLE_HANDS: Array<[HandSelector, string]> = [["either", "either hand"], 
 const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"], ["click", "click the mouse"], ["pointer", "move the pointer"]];
 const BUTTONS: Array<[MouseButton, string]> = [["left", "left button"], ["right", "right button"], ["middle", "middle button"]];
 const CLICK: Action = { type: "click", button: "left", count: 1 };
-const POINTER: Action = { type: "pointer", gain: 2, centerX: 0.5, centerY: 0.5 };
+const POINTER: Action = { type: "pointer", gain: 2, offsetX: 0, offsetY: 0 };
 const POINTER_MODES: Array<[PointerMode, string]> = [
   ["absolute", "absolute (finger position is cursor position)"],
   ["relative", "relative (trackpad: finger motion moves the cursor)"],
@@ -29,9 +29,9 @@ const GAIN_HELP = "How far the cursor travels for a given finger travel, in scre
   + "2: half the view does it (faster, coarser). 0.5: it takes two passes (slower, finer).";
 const ABS_GAIN_HELP = "How much of the camera view covers the screen: 1 is the whole view, 2 the middle half, 3 the middle third. "
   + "Higher means smaller hand moves (and more visible jitter).";
-const CENTER_X_HELP = "Where the active region sits left to right, as a fraction of the view (0.5 is the middle).";
-const CENTER_Y_HELP = "Where the active region sits top to bottom, as a fraction of the view from the top (0.5 is the middle, smaller is higher). "
-  + "Raise it (lower the number) so the bottom of the screen is reached before your hand drops out of view.";
+const OFFSET_X_HELP = "Slides the active region left or right, as a fraction of the view. 0 is centered; positive is to your right, negative to your left.";
+const OFFSET_Y_HELP = "Slides the active region up or down, as a fraction of the view. 0 is centered; positive is up, negative is down. "
+  + "Raise it so the bottom of the screen is reached before your hand drops out of view.";
 const PRESS_TRIGGERS: Array<[Trigger, string]> = [
   ["engage", "on engage"], ["hold", "after held"], ["release", "on release"],
   ["flick-left", "flick left"], ["flick-right", "flick right"], ["flick-up", "flick up"], ["flick-down", "flick down"],
@@ -352,12 +352,12 @@ export class Bindings {
         } else {
           mrow.append(
             labeled("Gain", numberInput(a.gain ?? 2, 1, 10, 0.1, (v) => setAction({ ...a, gain: v })), ABS_GAIN_HELP),
-            labeled("Center (across)", numberInput(a.centerX ?? 0.5, 0, 1, 0.05, (v) => setAction({ ...a, centerX: v })), CENTER_X_HELP),
-            labeled("Center (up/down)", numberInput(a.centerY ?? 0.5, 0, 1, 0.05, (v) => setAction({ ...a, centerY: v })), CENTER_Y_HELP),
+            labeled("Offset (left/right)", numberInput(a.offsetX ?? 0, -0.5, 0.5, 0.05, (v) => setAction({ ...a, offsetX: v })), OFFSET_X_HELP),
+            labeled("Offset (up/down)", numberInput(a.offsetY ?? 0, -0.5, 0.5, 0.05, (v) => setAction({ ...a, offsetY: v })), OFFSET_Y_HELP),
           );
           p.textContent = "The finger's position in a region of the camera view is the cursor's position on the screen. "
-            + "Gain sets the region's size (2: the middle half of the view is the whole screen), the center sets where it sits; "
-            + "it is held inside the view. Smoothed fingertip position.";
+            + "Gain sets the region's size (2: the middle half of the view is the whole screen). The offsets slide it from the middle: "
+            + "0 is centered, positive is right or up, negative is left or down. It is held inside the view. Smoothed fingertip position.";
           asec.append(mrow, p);
         }
       } else {
@@ -482,7 +482,7 @@ function summary(c: Control): string {
   if (a.type === "hold-key") return `hold ${a.key}`;
   if (a.type === "press-key") return `press ${a.key}`;
   if (a.type === "click") return `${a.count === 2 ? "double-click" : "click"} ${a.button}`;
-  if (a.type === "pointer") return `move the pointer (gain ${a.gain ?? 2}, center ${a.centerX ?? 0.5} × ${a.centerY ?? 0.5})`;
+  if (a.type === "pointer") return `move the pointer (gain ${a.gain ?? 2}, offset ${a.offsetX ?? 0} × ${a.offsetY ?? 0})`;
   return `scroll ${a.axis} ×${a.sensitivity}${a.invert ? " inverted" : ""}`;
 }
 
