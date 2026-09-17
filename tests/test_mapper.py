@@ -31,6 +31,9 @@ class Recorder:
     def click(self, button, count):
         self.log.append(("click", button, count))
 
+    def move_by(self, dx, dy):
+        self.log.append(("move_by", round(dx, 6), round(dy, 6)))
+
     def move_to(self, fx, fy):
         self.log.append(("move", round(fx, 3), round(fy, 3)))
 
@@ -171,15 +174,19 @@ def pointing_at(x, y, handedness="left"):
     return h
 
 
-def doc_with_pointer(mode="absolute"):
+def doc_with_pointer(mode="absolute", gain=1.0):
     return MappingDocument(
-        controls=[Control("ptr", "Pointer", "action", parse_action({"type": "pointer"}))],
+        controls=[Control("ptr", "Pointer", "action", parse_action({"type": "pointer", "gain": gain}))],
         bindings=[Binding("b1", "point", "left", "ptr", mode=mode)],
     )
 
 
 def moves(rec):
     return [m for m in rec.log if m[0] == "move"]
+
+
+def steps(rec):
+    return [m for m in rec.log if m[0] == "move_by"]
 
 
 def test_pointer_maps_the_rectangle_to_the_screen():
@@ -222,19 +229,77 @@ def test_pointer_uses_the_raw_position_not_the_filtered_one():
     assert moves(rec)[-1] == ("move", 0.75, 0.25)
 
 
-def test_pointer_in_relative_mode_does_nothing_yet():
+def test_relative_pointer_moves_by_the_fingers_travel_not_its_position():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    Mapper(engine, doc_with_pointer(mode="relative"), rec)
+    # Engaging and holding still moves nothing, wherever the finger is.
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [pointing_at(0.8, 0.2)]))
+    assert rec.log == []
+    # Image x 0.8 -> 0.7 is the user's finger moving 0.1 frame to the right;
+    # image y down is screen y down.
+    engine.update(frame(100, [pointing_at(0.7, 0.25)]))
+    assert steps(rec) == [("move_by", 0.1, 0.05)]
+    assert moves(rec) == []
+
+
+def test_relative_pointer_continues_from_where_it_stopped_after_re_engage():
     engine = GestureEngine([Point()])
     rec = Recorder()
     Mapper(engine, doc_with_pointer(mode="relative"), rec)
     for t in range(0, 100, 10):
         engine.update(frame(t, [pointing_at(0.5, 0.5)]))
-    assert moves(rec) == []
+    engine.update(frame(100, [pointing_at(0.4, 0.5)]))
+    assert steps(rec) == [("move_by", 0.1, 0.0)]
+    # Release (a fist), reposition the hand far away, engage again: the
+    # re-engage itself moves nothing, and the next motion is a plain step.
+    for t in range(110, 300, 10):
+        engine.update(frame(t, [hand(0.0, handedness="left")]))
+    for t in range(300, 400, 10):
+        engine.update(frame(t, [pointing_at(0.9, 0.9)]))
+    assert steps(rec) == [("move_by", 0.1, 0.0)]
+    engine.update(frame(400, [pointing_at(0.8, 0.9)]))
+    assert steps(rec) == [("move_by", 0.1, 0.0), ("move_by", 0.1, 0.0)]
+
+
+def test_relative_pointer_gain_scales_the_travel():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    Mapper(engine, doc_with_pointer(mode="relative", gain=2.0), rec)
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [pointing_at(0.5, 0.5)]))
+    engine.update(frame(100, [pointing_at(0.4, 0.55)]))
+    assert steps(rec) == [("move_by", 0.2, 0.1)]
+
+
+def test_absolute_and_relative_pointers_work_in_the_same_session():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    ptr = parse_action({"type": "pointer"})
+    doc = MappingDocument(
+        controls=[Control("ptr", "Pointer", "action", ptr)],
+        bindings=[
+            Binding("abs", "point", "left", "ptr", mode="absolute"),
+            Binding("rel", "point", "right", "ptr", mode="relative"),
+        ],
+    )
+    Mapper(engine, doc, rec)
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [pointing_at(0.5, 0.5, "left"), pointing_at(0.5, 0.5, "right")]))
+    assert moves(rec)[-1] == ("move", 0.5, 0.5) and steps(rec) == []
+    engine.update(frame(100, [pointing_at(0.35, 0.5, "left"), pointing_at(0.4, 0.5, "right")]))
+    assert moves(rec)[-1] == ("move", 0.75, 0.5)
+    assert steps(rec) == [("move_by", 0.1, 0.0)]
 
 
 def test_pointer_action_round_trips_and_rejects_a_bad_rectangle():
     import pytest
 
-    assert action_to_json(parse_action({"type": "pointer"})) == {"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8}
+    assert action_to_json(parse_action({"type": "pointer"})) == {"type": "pointer", "left": 0.2, "top": 0.2, "right": 0.8, "bottom": 0.8, "gain": 1.0}
+    assert parse_action({"type": "pointer", "gain": 2.5}).gain == 2.5
+    with pytest.raises(ValueError):
+        parse_action({"type": "pointer", "gain": 0})
     with pytest.raises(ValueError):
         parse_action({"type": "pointer", "left": 0.9, "right": 0.1})
 

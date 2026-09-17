@@ -22,6 +22,10 @@ class Performer(Protocol):
         """Put the cursor at a fraction of the main display, 0..1 from its
         top left."""
         ...
+    def move_by(self, dx: float, dy: float) -> None:
+        """Move the cursor from where it is by a fraction of the main
+        display's width and height, stopping at its edges."""
+        ...
 
 
 class Mapper:
@@ -34,6 +38,9 @@ class Mapper:
         way down so nothing sticks."""
         self._held: set[str] = set()
         """Chords currently held by hold-key bindings, keyed by binding id."""
+        self._last_raw: dict[tuple[str, str], tuple[float, float]] = {}
+        """Relative pointing: the previous raw anchor per (gesture, hand)
+        while engaged, so each event moves the cursor by the change."""
         self._unsub = [engine.on("gesture", self._on_gesture), engine.on("delta", self._on_delta)]
 
     def set_enabled(self, on: bool) -> None:
@@ -46,6 +53,7 @@ class Mapper:
         for chord in list(self._held):
             self.performer.key_up(chord)
         self._held.clear()
+        self._last_raw.clear()
 
     def load(self, doc: MappingDocument) -> None:
         self.release_all()
@@ -67,6 +75,8 @@ class Mapper:
 
     def _on_gesture(self, e: GestureEvent) -> None:
         fired: Trigger = f"flick-{e.direction or 'up'}" if e.phase == "flick" else e.phase  # type: ignore[assignment]
+        if e.phase == "release":
+            self._last_raw.pop((e.gesture_id, e.hand), None)
         for b in self._matching(e.gesture_id, e.hand):
             c = self.doc.control(b.control_id)
             if c is None or c.action is None:
@@ -104,6 +114,8 @@ class Mapper:
             if isinstance(c.action, Pointer):
                 if b.mode == "absolute":
                     self._point_absolute(c.action, e)
+                else:
+                    self._point_relative(c.action, e)
                 continue
             if not isinstance(c.action, Scroll):
                 continue
@@ -128,3 +140,21 @@ class Mapper:
         fx = (x - a.left) / (a.right - a.left)
         fy = (y - a.top) / (a.bottom - a.top)
         self.performer.move_to(min(max(fx, 0.0), 1.0), min(max(fy, 0.0), 1.0))
+
+    def _point_relative(self, a: Pointer, e: DeltaEvent) -> None:
+        # Trackpad feel: the first event after engage only records where
+        # the finger is, so engaging never jumps the cursor. Each later
+        # event moves it by the raw anchor's travel since the previous
+        # one, in user space, scaled by the gain. Raw rather than the
+        # engine's filtered step for the same reason as absolute mode.
+        x, y = e.raw
+        if self.engine.mirrored:
+            x = 1 - x
+        key = (e.gesture_id, e.hand)
+        last = self._last_raw.get(key)
+        self._last_raw[key] = (x, y)
+        if last is None:
+            return
+        dx, dy = (x - last[0]) * a.gain, (y - last[1]) * a.gain
+        if dx or dy:
+            self.performer.move_by(dx, dy)
