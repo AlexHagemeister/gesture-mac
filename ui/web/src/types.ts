@@ -48,6 +48,9 @@ export interface MappingDocument {
 
 export interface Thresholds { enter: number; exit: number; onsetMs: number; holdMs: number }
 
+/** The engine's One Euro constants, shared by every continuous gesture. */
+export interface Smoothing { minCutoff: number; beta: number; dCutoff: number }
+
 export interface GestureInfo {
   id: string;
   label: string;
@@ -59,6 +62,7 @@ export interface GestureInfo {
 
 export interface StateResponse {
   gestures: GestureInfo[];
+  smoothing: Smoothing;
   mappings: MappingDocument;
   mappingsPath: string;
   enabled: boolean;
@@ -108,7 +112,9 @@ export interface DeltaMsg {
 export interface MappingsMsg { type: "mappings"; mappings: MappingDocument }
 export interface ThresholdsMsg { type: "thresholds"; gestureId: string; thresholds: Thresholds }
 
-export type Msg = FrameMsg | GestureMsg | DeltaMsg | MappingsMsg | ThresholdsMsg;
+export interface SmoothingMsg { type: "smoothing"; smoothing: Smoothing }
+
+export type Msg = FrameMsg | GestureMsg | DeltaMsg | MappingsMsg | ThresholdsMsg | SmoothingMsg;
 
 /** The selected absolute pointer binding's region, for the HUD to draw:
  * edges as fractions of the mirrored view from its top left (user space,

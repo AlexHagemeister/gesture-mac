@@ -13,7 +13,7 @@
  */
 import { recordChord, type Recording } from "./keys";
 import type { Remote } from "./remote";
-import { handMatches, pointerRegion, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type PointerRegion, type ScrollAxis, type Thresholds, type Trigger } from "./types";
+import { handMatches, pointerRegion, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type PointerRegion, type ScrollAxis, type Smoothing, type Thresholds, type Trigger } from "./types";
 
 const SINGLE_HANDS: Array<[HandSelector, string]> = [["either", "either hand"], ["left", "left hand"], ["right", "right hand"]];
 const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"], ["click", "click the mouse"], ["pointer", "move the pointer"]];
@@ -73,6 +73,7 @@ export class Bindings {
     this.renderAll();
     remote.on("mappings", () => this.renderAll());
     remote.on("thresholds", () => this.renderDetail());
+    remote.on("smoothing", () => this.renderDetail());
     remote.on("gesture", (e) => {
       if (e.phase === "engage" || e.phase === "flick") this.flashRows(e.gestureId, e.hand);
     });
@@ -439,6 +440,24 @@ export class Bindings {
       note.textContent = "Applies to every binding on this gesture. Live until the app restarts; not saved.";
       tsec.append(grid, note);
       pane.append(tsec);
+    }
+
+    // Smoothing, shared by every continuous gesture.
+    if (g?.continuous) {
+      const ssec = section("Smoothing");
+      const grid = el("div", "thresholds");
+      const sm = this.remote.smoothing;
+      const field = (key: keyof Smoothing, label: string, min: number, max: number, step: number, help: string) =>
+        labeled(label, numberInput(sm[key], min, max, step, (v) => { this.remote.setSmoothing({ [key]: v }).catch((e: Error) => { this.errorEl.textContent = e.message; }); }), help);
+      grid.append(
+        field("minCutoff", "Slow moves", 0.1, 30, 0.5, "How closely it follows a slow or resting hand. Higher trails less on precise moves and shivers more when you hold still. 1 is about 160 ms behind, 3 about 50 ms."),
+        field("dCutoff", "Pickup", 0.1, 30, 0.5, "How quickly it notices a move starting and loosens up. Higher reacts sooner and is twitchier on a shaky hand."),
+        field("beta", "Fast moves", 0, 200, 5, "How much it loosens as the hand speeds up. Higher trails less on sweeps. 20 is already near raw at a brisk speed."),
+      );
+      const note = el("p", "hint");
+      note.textContent = "Higher is snappier, lower is steadier. Applies to every continuous gesture, and to a move already in progress. Live until the app restarts; not saved.";
+      ssec.append(grid, note);
+      pane.append(ssec);
     }
   }
 

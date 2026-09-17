@@ -9,9 +9,11 @@ Messages (JSON text frames, "type" field):
     delta      an engine delta event (axes in user space, anchors in image coords)
     mappings   the mapping document changed (any client, or a disk reload)
     thresholds one gesture's thresholds changed
+    smoothing  the engine's smoothing constants changed
 
 The API's state object (GET /api/state) carries the gesture list with
-thresholds, the mapping document, and where it lives on disk.
+thresholds, the smoothing constants, the mapping document, and where it
+lives on disk.
 """
 from __future__ import annotations
 
@@ -64,9 +66,26 @@ def thresholds_patch(raw: dict) -> dict[str, float]:
     return patch
 
 
+SMOOTHING_NAMES = {"minCutoff": "min_cutoff", "beta": "beta", "dCutoff": "d_cutoff"}
+
+
+def smoothing_json(s: dict[str, float]) -> dict:
+    return {k: s[v] for k, v in SMOOTHING_NAMES.items()}
+
+
+def smoothing_patch(raw: dict) -> dict[str, float]:
+    patch = {}
+    for k, v in raw.items():
+        if k not in SMOOTHING_NAMES:
+            raise ValueError(f"unknown smoothing constant: {k}")
+        patch[SMOOTHING_NAMES[k]] = float(v)
+    return patch
+
+
 def state_json(rt: Runtime, mappings_path: str) -> dict:
     return {
         "gestures": gesture_list(rt),
+        "smoothing": smoothing_json(rt.engine.smoothing),
         "mappings": document_to_json(rt.mapper.doc),
         "mappingsPath": mappings_path,
         "enabled": rt.cfg.enabled,

@@ -8,7 +8,8 @@ camera released, until the master switch is flipped.
 
 The menu bar talks to it through set_enabled(), set_camera(), reload_mappings(),
 and stop(). The HUD server reads last_frame and last_bgr (kept only while
-set_preview(True)) and edits thresholds through set_thresholds(). Everything
+set_preview(True)) and edits thresholds and smoothing through
+set_thresholds() and set_smoothing(). Everything
 else is private to the thread.
 """
 from __future__ import annotations
@@ -113,6 +114,10 @@ class Runtime:
             raise KeyError(gesture_id)
         g.thresholds = replace(g.thresholds, **patch)
         return g.thresholds
+
+    def set_smoothing(self, **patch: float) -> dict[str, float]:
+        """Live smoothing edit from the panel. Not persisted, like thresholds."""
+        return self.engine.set_smoothing(**patch)
 
     # ---- the loop --------------------------------------------------------
 

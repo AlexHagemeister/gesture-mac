@@ -51,6 +51,9 @@ class FakeRuntime:
         g.thresholds = replace(g.thresholds, **patch)
         return g.thresholds
 
+    def set_smoothing(self, **patch):
+        return self.engine.set_smoothing(**patch)
+
     def on_status(self, text: str) -> None:
         self.statuses.append(text)
 
@@ -122,6 +125,16 @@ async def test_thresholds_patch_is_live(client, rt):
     assert (t.enter, t.hold_ms) == (0.9, 250)
     assert (await client.put("/api/thresholds/nope", json={"enter": 0.9})).status == 404
     assert (await client.put("/api/thresholds/index-pinch", json={"bogus": 1})).status == 400
+
+
+async def test_smoothing_patch_is_live(client, rt):
+    assert (await (await client.get("/api/state")).json())["smoothing"] == {"minCutoff": 1.0, "beta": 20.0, "dCutoff": 1.0}
+    r = await client.put("/api/smoothing", json={"minCutoff": 3, "dCutoff": 4})
+    assert r.status == 200
+    assert await r.json() == {"minCutoff": 3.0, "beta": 20.0, "dCutoff": 4.0}
+    assert rt.engine.smoothing["min_cutoff"] == 3.0
+    assert (await client.put("/api/smoothing", json={"bogus": 1})).status == 400
+    assert (await client.put("/api/smoothing", json={"minCutoff": 0})).status == 400
 
 
 async def test_stream_runs_only_while_a_client_is_connected(client, rt):

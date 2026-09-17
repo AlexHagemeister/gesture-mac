@@ -117,3 +117,28 @@ def test_moving_hand_without_the_pose_reports_nothing():
     for t in range(0, 300, 10):
         engine.update(frame(t, [curled(offset_y=t / 1000)]))
     assert deltas == []
+
+
+def test_smoothing_changes_reach_a_drag_in_progress():
+    engine, _, _ = make()
+    assert engine.smoothing == {"min_cutoff": 1.0, "beta": 20.0, "d_cutoff": 1.0}
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [hand(0.05)]))
+    drags = [s.drag for s in engine._slots.values() if s.drag is not None]
+    assert len(drags) == 1
+    engine.set_smoothing(min_cutoff=3.0, d_cutoff=4.0)
+    d = drags[0]
+    for f in (d.filter.fx, d.filter.fy, d.angle_filter, d.scale_filter):
+        assert (f.min_cutoff, f.beta, f.d_cutoff) == (3.0, 20.0, 4.0)
+    assert engine.smoothing == {"min_cutoff": 3.0, "beta": 20.0, "d_cutoff": 4.0}
+
+
+def test_smoothing_rejects_unknown_and_nonpositive():
+    engine, _, _ = make()
+    import pytest
+
+    with pytest.raises(ValueError):
+        engine.set_smoothing(bogus=1.0)
+    with pytest.raises(ValueError):
+        engine.set_smoothing(min_cutoff=0.0)
+    assert engine.smoothing["min_cutoff"] == 1.0
