@@ -4,7 +4,7 @@
  * thresholds) back over HTTP. Holds the current gesture list and mapping
  * document so the HUD and panel read from one place.
  */
-import type { GestureInfo, MappingDocument, Msg, StateResponse, Thresholds } from "./types";
+import type { GestureInfo, MappingDocument, Msg, Smoothing, StateResponse, Thresholds } from "./types";
 
 type Listener<T> = (msg: T) => void;
 type Kind = Msg["type"] | "status";
@@ -12,6 +12,7 @@ type MsgOf<K extends Msg["type"]> = Extract<Msg, { type: K }>;
 
 export class Remote {
   gestures: GestureInfo[] = [];
+  smoothing: Smoothing = { minCutoff: 1, beta: 20, dCutoff: 1 };
   doc: MappingDocument = { version: 2, controls: [], bindings: [] };
   mappingsPath = "";
   connected = false;
@@ -22,6 +23,7 @@ export class Remote {
   async init(): Promise<void> {
     const state = await this.getJson<StateResponse>("/api/state");
     this.gestures = state.gestures;
+    this.smoothing = state.smoothing;
     this.doc = state.mappings;
     this.mappingsPath = state.mappingsPath;
   }
@@ -47,6 +49,7 @@ export class Remote {
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data as string) as Msg;
       if (msg.type === "mappings") this.doc = msg.mappings;
+      if (msg.type === "smoothing") this.smoothing = msg.smoothing;
       if (msg.type === "thresholds") {
         const g = this.gestures.find((x) => x.id === msg.gestureId);
         if (g) g.thresholds = msg.thresholds;
@@ -93,6 +96,10 @@ export class Remote {
     const t = await this.sendJson<Thresholds>("PUT", `/api/thresholds/${encodeURIComponent(gestureId)}`, patch);
     const g = this.gestures.find((x) => x.id === gestureId);
     if (g) g.thresholds = t;
+  }
+
+  async setSmoothing(patch: Partial<Smoothing>): Promise<void> {
+    this.smoothing = await this.sendJson<Smoothing>("PUT", "/api/smoothing", patch);
   }
 
   private async getJson<T>(url: string): Promise<T> {

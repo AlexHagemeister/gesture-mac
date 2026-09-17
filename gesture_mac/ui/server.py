@@ -9,6 +9,7 @@ Routes:
     PUT  /api/mappings          replace the document: validate, save, hot-reload
     POST /api/validate-key      {"key": chord} -> {"ok": bool, "error": str|null}
     PUT  /api/thresholds/{id}   live threshold patch for one gesture
+    PUT  /api/smoothing         live patch of the engine's smoothing constants
     GET  /ws                    the stream (see wire.py)
 
 Every write to mappings.json goes through the same parser the mapper
@@ -90,6 +91,14 @@ def build_app(rt: Runtime, publisher: wire.Publisher, mappings_path: Path | None
         await publisher.broadcast({"type": "thresholds", "gestureId": gid, "thresholds": out})
         return web.json_response(out)
 
+    async def put_smoothing(req: web.Request) -> web.Response:
+        try:
+            out = wire.smoothing_json(rt.set_smoothing(**wire.smoothing_patch(await req.json())))
+        except (ValueError, TypeError) as e:
+            return web.json_response({"error": str(e)}, status=400)
+        await publisher.broadcast({"type": "smoothing", "smoothing": out})
+        return web.json_response(out)
+
     async def ws(req: web.Request) -> web.WebSocketResponse:
         sock = web.WebSocketResponse(heartbeat=20)
         await sock.prepare(req)
@@ -111,6 +120,7 @@ def build_app(rt: Runtime, publisher: wire.Publisher, mappings_path: Path | None
     app.router.add_put("/api/mappings", put_mappings)
     app.router.add_post("/api/validate-key", validate_key)
     app.router.add_put("/api/thresholds/{id}", put_thresholds)
+    app.router.add_put("/api/smoothing", put_smoothing)
     app.router.add_get("/ws", ws)
     if (STATIC_DIR / "assets").exists():
         app.router.add_static("/assets", STATIC_DIR / "assets")

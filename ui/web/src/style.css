@@ -87,6 +87,9 @@ input.invalid { border-color: var(--danger); }
 .detail-head h2 { margin: 0; font-size: 1.15em; flex: 1; }
 .section { display: flex; flex-direction: column; gap: 0.6em; background: var(--card); border-radius: 0.7em; padding: 0.9em 1em; }
 .thresholds { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75em; }
+.slider { display: flex; align-items: center; gap: 0.6em; }
+.slider input { flex: 1; min-width: 0; accent-color: var(--accent, #3b6cf6); }
+.slider output { min-width: 2.5em; text-align: right; font-variant-numeric: tabular-nums; }
 .key-editor { display: flex; flex-direction: column; gap: 0.4em; outline: none; }
 .key-editor .row { align-items: end; }
 

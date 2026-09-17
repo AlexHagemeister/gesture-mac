@@ -13,7 +13,7 @@
  */
 import { recordChord, type Recording } from "./keys";
 import type { Remote } from "./remote";
-import { handMatches, pointerRegion, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type PointerRegion, type ScrollAxis, type Thresholds, type Trigger } from "./types";
+import { handMatches, pointerRegion, type Action, type ActionType, type Binding, type Control, type HandKey, type HandSelector, type MappingDocument, type MouseButton, type PointerMode, type PointerRegion, type ScrollAxis, type Smoothing, type Thresholds, type Trigger } from "./types";
 
 const SINGLE_HANDS: Array<[HandSelector, string]> = [["either", "either hand"], ["left", "left hand"], ["right", "right hand"]];
 const KINDS: Array<[ActionType, string]> = [["hold-key", "hold a key"], ["press-key", "press a key"], ["scroll", "scroll"], ["click", "click the mouse"], ["pointer", "move the pointer"]];
@@ -48,6 +48,7 @@ export class Bindings {
   private selectedId: string | null = null;
   private draft: Draft | null = null;
   private recording: Recording | null = null;
+  private smoothingSync: Array<(s: Smoothing) => void> = [];
   private readonly rowsEl: HTMLElement;
   private readonly errorEl: HTMLElement;
   private readonly engaged = new Set<string>();
@@ -73,6 +74,9 @@ export class Bindings {
     this.renderAll();
     remote.on("mappings", () => this.renderAll());
     remote.on("thresholds", () => this.renderDetail());
+    // In place, not a re-render: rebuilding the pane on every change would
+    // pull a slider out from under the drag that caused it.
+    remote.on("smoothing", (m) => { for (const sync of this.smoothingSync) sync(m.smoothing); });
     remote.on("gesture", (e) => {
       if (e.phase === "engage" || e.phase === "flick") this.flashRows(e.gestureId, e.hand);
     });
@@ -440,6 +444,28 @@ export class Bindings {
       tsec.append(grid, note);
       pane.append(tsec);
     }
+
+    // Smoothing, shared by every continuous gesture.
+    if (g?.continuous) {
+      const ssec = section("Smoothing");
+      const grid = el("div", "thresholds");
+      const sm = this.remote.smoothing;
+      this.smoothingSync = [];
+      const field = (key: keyof Smoothing, label: string, min: number, max: number, step: number, help: string) => {
+        const sl = slider(sm[key], min, max, step, (v) => { this.remote.setSmoothing({ [key]: v }).catch((e: Error) => { this.errorEl.textContent = e.message; }); });
+        this.smoothingSync.push((next) => sl.set(next[key]));
+        return labeled(label, sl.el, help);
+      };
+      grid.append(
+        field("minCutoff", "Slow moves", 0.5, 10, 0.5, "How closely it follows a slow or resting hand. Higher trails less on precise moves and shivers more when you hold still. 1 is about 160 ms behind, 3 about 50 ms."),
+        field("dCutoff", "Pickup", 0.5, 10, 0.5, "How quickly it notices a move starting and loosens up. Higher reacts sooner and is twitchier on a shaky hand."),
+        field("beta", "Fast moves", 0, 100, 5, "How much it loosens as the hand speeds up. Higher trails less on sweeps. 20 is already near raw at a brisk speed."),
+      );
+      const note = el("p", "hint");
+      note.textContent = "Higher is snappier, lower is steadier. Applies to every continuous gesture, and to a move already in progress. Saved as you go: the app starts with these next time.";
+      ssec.append(grid, note);
+      pane.append(ssec);
+    }
   }
 
   /** The key field: type a chord name, or press Record and press the keys. */
@@ -560,6 +586,24 @@ function select(options: Array<[string, string]>, value: string, onChange: (v: s
   s.value = value;
   s.onchange = () => onChange(s.value);
   return s;
+}
+
+/** A range input with its value shown beside it. onChange fires while
+ * dragging, so a live parameter is felt under the thumb. set() is for a
+ * value arriving from elsewhere and leaves a slider in hand alone. */
+function slider(value: number, min: number, max: number, step: number, onChange: (v: number) => void): { el: HTMLElement; set: (v: number) => void } {
+  const wrap = el("div", "slider");
+  const i = document.createElement("input");
+  const out = el("output");
+  i.type = "range";
+  i.min = String(min); i.max = String(max); i.step = String(step); i.value = String(value);
+  out.textContent = String(value);
+  i.oninput = () => { out.textContent = i.value; onChange(Number(i.value)); };
+  wrap.append(i, out);
+  return {
+    el: wrap,
+    set: (v) => { if (document.activeElement !== i) i.value = String(v); out.textContent = i.value; },
+  };
 }
 
 function numberInput(value: number, min: number, max: number, step: number, onChange: (v: number) => void): HTMLInputElement {

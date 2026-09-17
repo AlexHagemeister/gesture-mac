@@ -8,7 +8,8 @@ camera released, until the master switch is flipped.
 
 The menu bar talks to it through set_enabled(), set_camera(), reload_mappings(),
 and stop(). The HUD server reads last_frame and last_bgr (kept only while
-set_preview(True)) and edits thresholds through set_thresholds(). Everything
+set_preview(True)) and edits thresholds (live only) and smoothing (saved to config) through
+set_thresholds() and set_smoothing(). Everything
 else is private to the thread.
 """
 from __future__ import annotations
@@ -30,7 +31,7 @@ from ..engine import GestureEngine
 from ..gestures import GestureThresholds, default_gestures
 from ..mapping import Mapper, load_document
 from ..output import MacPerformer, accessibility_trusted
-from .config import Config, ensure_mappings
+from .config import Config, ensure_mappings, save_config
 from .tracking import TrackerGuard
 
 log = logging.getLogger(__name__)
@@ -43,6 +44,10 @@ class Runtime:
         os.environ.setdefault("OPENCV_AVFOUNDATION_SKIP_AUTH", "1")
         self.camera_ok = False
         self.engine = GestureEngine(default_gestures())
+        try:
+            self.engine.set_smoothing(**cfg.smoothing)
+        except (ValueError, TypeError) as e:
+            log.warning("ignoring smoothing in config.json: %s", e)
         self.mapper = Mapper(self.engine, load_document(ensure_mappings()), MacPerformer())
         self.mapper.set_enabled(cfg.enabled)
         self.engine.on("gesture", lambda e: log.info("%s %s %s", e.gesture_id, e.hand, e.phase))
@@ -113,6 +118,14 @@ class Runtime:
             raise KeyError(gesture_id)
         g.thresholds = replace(g.thresholds, **patch)
         return g.thresholds
+
+    def set_smoothing(self, **patch: float) -> dict[str, float]:
+        """Live smoothing edit from the panel, saved so the next launch
+        starts with it: these are tuned by feel over time (Alex, issue #24)."""
+        out = self.engine.set_smoothing(**patch)
+        self.cfg.smoothing = out
+        save_config(self.cfg)
+        return out
 
     # ---- the loop --------------------------------------------------------
 

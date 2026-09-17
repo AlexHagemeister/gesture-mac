@@ -61,11 +61,35 @@ class GestureEngine(Emitter):
         (the mapper's pointer needs to undo it without a filter)."""
         self._flick_distance = flick_distance
         self._flick_max_ms = flick_max_ms
-        self._filter_opts = filter_opts or {}
+        self._filter_opts = {"min_cutoff": 1.0, "beta": 20.0, "d_cutoff": 1.0} | (filter_opts or {})
         self._slots: dict[tuple[str, HandKey], _Slot] = {}
         for g in gestures:
             for h in self.hands_for(g):
                 self._slots[(g.id, h)] = _Slot(g.new_instance())
+
+    @property
+    def smoothing(self) -> dict[str, float]:
+        """The One Euro constants every continuous gesture's anchor runs through."""
+        return dict(self._filter_opts)
+
+    def set_smoothing(self, **patch: float) -> dict[str, float]:
+        """Change the constants live: new drags start with them, and a drag
+        in progress takes them on its next frame, so a slider can be felt
+        without letting go."""
+        for k, v in patch.items():
+            if k not in self._filter_opts:
+                raise ValueError(f"unknown smoothing constant: {k}")
+            if not v > 0:
+                raise ValueError(f"{k} must be above 0")
+        self._filter_opts.update(patch)
+        for slot in self._slots.values():
+            if slot.drag is not None:
+                d = slot.drag
+                for f in (d.filter.fx, d.filter.fy, d.angle_filter, d.scale_filter):
+                    f.min_cutoff = self._filter_opts["min_cutoff"]
+                    f.beta = self._filter_opts["beta"]
+                    f.d_cutoff = self._filter_opts["d_cutoff"]
+        return self.smoothing
 
     @staticmethod
     def hands_for(g: Gesture) -> list[HandKey]:
