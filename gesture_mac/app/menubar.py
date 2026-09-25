@@ -53,7 +53,7 @@ class GestureMacApp(rumps.App):
         self.status_item.set_callback(None)
         self.camera_menu = rumps.MenuItem("Camera")
         self._build_camera_menu()
-        self.toasts_item = rumps.MenuItem("Command toasts", callback=self.toggle_toasts)
+        self.toasts_item = rumps.MenuItem("Show command names", callback=self.toggle_toasts)
         self.toasts_item.state = self.cfg.toasts
 
         self.menu = [
