@@ -13,6 +13,32 @@ hotkey. A short pinch taps it (toggle dictation), a long pinch holds it
 (dictate, then paste on release). Superwhisper does the tap/hold logic; the
 app only makes the key follow the pinch.
 
+## Feel: affordances and feedback
+
+Gesture control is a new kind of input for almost everyone who touches it,
+its first user included. Nobody arrives with habits for it, so the app has
+to teach itself and never leave the user guessing. These are directions,
+not features:
+
+- **Always answer "did it see me?"** Every state that matters (hand in
+  view, gesture recognized, command fired) has a readout the user can
+  catch without opening a window. Feedback comes in layers of rising
+  attention: a glance, a moment, a watch, full detail.
+- **Name what happened.** When a binding fires, the user can tell which
+  one it was, by the name they gave it.
+- **Feedback stays out of the way.** No feedback surface takes keyboard
+  focus or clicks from the app the user is working in, and each one can
+  be turned off.
+- **Configuring is part of the experience.** Setting up a binding should
+  feel as direct as using one: see the gesture, pick the action, try it,
+  adjust. Tuning (thresholds, smoothing, pointer regions) is visible and
+  live, not numbers edited blind.
+- **Mistakes are cheap and legible.** An accidental trigger is a design
+  problem, not user error. Prefer clutches, holds, and gates that make
+  intent explicit, and make it clear why a gesture did or did not fire.
+- **Don't double up.** When the target app already gives feedback
+  (superwhisper's start sound and waveform), the app adds nothing on top.
+
 ## Why native
 
 The sibling repo, gesture-template (~/dev/gesture-template), is the same
@@ -58,3 +84,6 @@ with the template's version-2 MappingDocument.
 Design record in Alex's exocortex vault: wiki/projects/gesture-peripheral-mac.md
 and the 2026-09-15 session captures. Decision to build native: Alex,
 2026-09-15. Synthesized right-option verified against superwhisper the same day.
+Feel section: Alex, 2026-09-25, "especially given how experimental the app
+is, like how it'll be a brand new experience so it needs to feel good and
+intuitive to use and configure."
