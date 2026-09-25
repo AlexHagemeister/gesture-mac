@@ -1,7 +1,7 @@
 """On-disk settings. Everything lives under
 ~/Library/Application Support/gesture-mac/:
 
-    config.json     enabled, camera name, frame rates, smoothing, HUD port
+    config.json     enabled, toasts, camera name, frame rates, smoothing, HUD port
     mappings.json   the bindings document (seeded from presets/default.json)
 """
 from __future__ import annotations
@@ -24,6 +24,8 @@ OLD_DEFAULT_FPS = 15.0
 class Config:
     enabled: bool = True
     """The master switch: off releases the camera and performs nothing."""
+    toasts: bool = True
+    """Name each command as it fires, under the menu bar icon (issue #27)."""
     camera: str | None = None
     """Camera name as AVFoundation reports it; None = built-in."""
     fps: float = DEFAULT_FPS

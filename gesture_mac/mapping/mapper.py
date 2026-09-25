@@ -1,10 +1,12 @@
 """Applies engine events to bindings and asks a Performer to carry out the
 resulting actions. The Performer protocol is the seam between this package
 and macOS: tests pass a recording fake, the app passes output.MacPerformer.
+on_fire hears the label of each control a binding sets off, for the
+command toast.
 """
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Callable, Protocol
 
 from ..engine.engine import GestureEngine
 from ..engine.events import DeltaEvent, GestureEvent
@@ -29,10 +31,20 @@ class Performer(Protocol):
 
 
 class Mapper:
-    def __init__(self, engine: GestureEngine, doc: MappingDocument, performer: Performer) -> None:
+    def __init__(
+        self,
+        engine: GestureEngine,
+        doc: MappingDocument,
+        performer: Performer,
+        on_fire: Callable[[str], None] | None = None,
+    ) -> None:
         self.engine = engine
         self.doc = doc
         self.performer = performer
+        self.on_fire = on_fire or (lambda label: None)
+        """Called with the control's label each time a binding acts: a key
+        goes down or is pressed, a click is made, or a continuous action
+        engages. Runs on the engine's thread."""
         self.enabled = True
         """When False, events are ignored. Held keys are released on the
         way down so nothing sticks."""
@@ -92,17 +104,25 @@ class Mapper:
                 if e.phase == down_on and self.enabled and a.key not in self._held:
                     self._held.add(a.key)
                     self.performer.key_down(a.key)
+                    self.on_fire(c.label)
                 elif e.phase == "release" and a.key in self._held:
                     self._held.discard(a.key)
                     self.performer.key_up(a.key)
             elif isinstance(a, PressKey):
                 if self.enabled and b.trigger == fired:
                     self.performer.key_press(a.key)
+                    self.on_fire(c.label)
             elif isinstance(a, Click):
                 # Each phase fires once per engage in the engine, so one
                 # pinch is one click and a held pinch never repeats.
                 if self.enabled and b.trigger == fired:
                     self.performer.click(a.button, a.count)
+                    self.on_fire(c.label)
+            elif isinstance(a, (Pointer, Scroll)):
+                # These act on every delta event, so they are named once,
+                # when the gesture engages, not per frame.
+                if self.enabled and e.phase == "engage":
+                    self.on_fire(c.label)
 
     def _on_delta(self, e: DeltaEvent) -> None:
         if not self.enabled:

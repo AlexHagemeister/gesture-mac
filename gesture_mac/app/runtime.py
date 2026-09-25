@@ -7,7 +7,7 @@ to recover from; when it gives up the loop parks like the disabled state,
 camera released, until the master switch is flipped.
 
 The menu bar talks to it through set_enabled(), set_camera(), reload_mappings(),
-and stop(). The HUD server reads last_frame and last_bgr (kept only while
+and stop(), and hears each fired command's label through on_fire. The HUD server reads last_frame and last_bgr (kept only while
 set_preview(True)) and edits thresholds (live only) and smoothing (saved to config) through
 set_thresholds() and set_smoothing(). Everything
 else is private to the thread.
@@ -38,7 +38,12 @@ log = logging.getLogger(__name__)
 
 
 class Runtime:
-    def __init__(self, cfg: Config, on_status: Callable[[str], None] | None = None) -> None:
+    def __init__(
+        self,
+        cfg: Config,
+        on_status: Callable[[str], None] | None = None,
+        on_fire: Callable[[str], None] | None = None,
+    ) -> None:
         self.cfg = cfg
         self.on_status = on_status or (lambda s: None)
         os.environ.setdefault("OPENCV_AVFOUNDATION_SKIP_AUTH", "1")
@@ -48,7 +53,7 @@ class Runtime:
             self.engine.set_smoothing(**cfg.smoothing)
         except (ValueError, TypeError) as e:
             log.warning("ignoring smoothing in config.json: %s", e)
-        self.mapper = Mapper(self.engine, load_document(ensure_mappings()), MacPerformer())
+        self.mapper = Mapper(self.engine, load_document(ensure_mappings()), MacPerformer(), on_fire)
         self.mapper.set_enabled(cfg.enabled)
         self.engine.on("gesture", lambda e: log.info("%s %s %s", e.gesture_id, e.hand, e.phase))
         self.cameras: list[CameraInfo] = list_cameras()

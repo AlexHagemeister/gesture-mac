@@ -1,6 +1,7 @@
 """Hold-key bindings follow the pinch's lifetime (or start at the held
 phase with trigger "hold"); disabling releases held keys; press-key and
-click fire once on their trigger; a modifier gates a binding."""
+click fire once on their trigger; a modifier gates a binding; on_fire
+names each control once per firing."""
 from gesture_mac.capture.types import LM, Landmark
 from gesture_mac.engine import GestureEngine
 from gesture_mac.gestures.builtin.pinches import IndexPinch
@@ -113,6 +114,35 @@ def test_press_key_fires_once_on_trigger():
     assert rec.log == [("press", "cmd+shift+4")]
 
 
+def test_on_fire_names_the_control_once_per_firing():
+    engine = GestureEngine([IndexPinch()])
+    fired = []
+    Mapper(engine, doc_with_hold(), Recorder(), on_fire=fired.append)
+    pinch_cycle(engine)
+    pinch_cycle(engine, 500)
+    assert fired == ["Superwhisper", "Superwhisper"]
+
+
+def test_on_fire_is_silent_while_disabled():
+    engine = GestureEngine([IndexPinch()])
+    fired = []
+    m = Mapper(engine, doc_with_click(), Recorder(), on_fire=fired.append)
+    m.set_enabled(False)
+    pinch_cycle(engine)
+    assert fired == []
+
+
+def test_on_fire_follows_the_trigger_not_the_engage():
+    engine = GestureEngine([IndexPinch()])
+    fired = []
+    Mapper(engine, doc_with_click(trigger="release"), Recorder(), on_fire=fired.append)
+    for t in range(0, 100, 10):
+        engine.update(frame(t, [hand(0.05)]))
+    assert fired == []
+    engine.update(frame(110, [hand(1.0)]))
+    assert fired == ["Click"]
+
+
 def doc_with_click(trigger="engage", while_=None):
     return MappingDocument(
         controls=[Control("clk", "Click", "action", parse_action({"type": "click", "button": "left", "count": 1}))],
@@ -215,6 +245,17 @@ def test_pointer_maps_the_rectangle_to_the_screen():
     for t in range(1600, 3100, 10):
         engine.update(frame(t, [pointing_at(0.2, 0.8)]))
     assert moves(rec)[-1] == ("move", 1.0, 1.0)
+
+
+def test_pointer_is_named_once_on_engage_not_per_frame():
+    engine = GestureEngine([Point()])
+    rec = Recorder()
+    fired = []
+    Mapper(engine, doc_with_pointer(), rec, on_fire=fired.append)
+    for t in range(0, 1000, 10):
+        engine.update(frame(t, [pointing_at(0.5, 0.5)]))
+    assert len(moves(rec)) > 10
+    assert fired == ["Pointer"]
 
 
 def test_pointer_clamps_outside_the_rectangle_and_stops_on_release():
