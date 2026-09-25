@@ -1,5 +1,6 @@
 """The rumps menu bar app. Top item is the on/off toggle; below it the
-camera picker, Configure (the bindings page), mapping reload, and quit. The runtime thread does
+camera picker, the command toast switch, Configure (the bindings page),
+mapping reload, and quit. The runtime thread does
 the work; this file only wires menu items to it and persists config changes.
 
 The page's server starts the first time Configure is chosen and then
@@ -19,6 +20,7 @@ log = logging.getLogger(__name__)
 from ..ui import HudWindow, UiServer
 from .config import MAPPINGS_PATH, Config, load_config, save_config
 from .runtime import Runtime
+from .toast import Toast
 
 ICON_ON = "hand.raised"
 ICON_OFF = "hand.raised.slash"
@@ -39,7 +41,9 @@ class GestureMacApp(rumps.App):
         super().__init__("gesture-mac", quit_button=None)
         self.cfg: Config = load_config()
         self._pending_status: str | None = None
-        self.runtime = Runtime(self.cfg, on_status=self._status)
+        self.toast = Toast.alloc().init()
+        self.toast.anchor = self._icon_window
+        self.runtime = Runtime(self.cfg, on_status=self._status, on_fire=self._fired)
         self.ui: UiServer | None = None
         self.hud_window = HudWindow()
 
@@ -49,12 +53,15 @@ class GestureMacApp(rumps.App):
         self.status_item.set_callback(None)
         self.camera_menu = rumps.MenuItem("Camera")
         self._build_camera_menu()
+        self.toasts_item = rumps.MenuItem("Show command names", callback=self.toggle_toasts)
+        self.toasts_item.state = self.cfg.toasts
 
         self.menu = [
             self.enabled_item,
             self.status_item,
             None,
             self.camera_menu,
+            self.toasts_item,
             rumps.MenuItem("Configure", callback=self.open_hud),
             rumps.MenuItem("Reload mappings", callback=self.reload_mappings),
             rumps.MenuItem("Open mappings.json", callback=self.open_mappings),
@@ -94,6 +101,11 @@ class GestureMacApp(rumps.App):
         self.runtime.set_enabled(on)
         save_config(self.cfg)
         self._apply_icon()
+
+    def toggle_toasts(self, item: rumps.MenuItem) -> None:
+        item.state = not item.state
+        self.cfg.toasts = bool(item.state)
+        save_config(self.cfg)
 
     def reload_mappings(self, _item) -> None:
         try:
@@ -147,6 +159,16 @@ class GestureMacApp(rumps.App):
         """Safe from any thread: stores the text for _flush_status."""
         self._pending_status = text
         log.info("status: %s", text)
+
+    def _fired(self, label: str) -> None:
+        """From the capture thread; the toast hops to the main thread itself."""
+        if self.cfg.toasts:
+            self.toast.show(label)
+
+    def _icon_window(self):
+        item = getattr(getattr(self, "_nsapp", None), "nsstatusitem", None)
+        button = item.button() if item is not None else None
+        return button.window() if button is not None else None
 
     def _apply_icon(self) -> None:
         img = symbol_image(ICON_ON if self.cfg.enabled else ICON_OFF)

@@ -1,4 +1,5 @@
-"""Config loading: the old active-rate default reads as the current one."""
+"""Config loading: the old active-rate default reads as the current one;
+smoothing and the toast switch survive a save."""
 from __future__ import annotations
 
 import json
@@ -35,3 +36,10 @@ def test_smoothing_round_trips_and_defaults_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "SUPPORT_DIR", tmp_path)
     config.save_config(cfg)
     assert config.load_config().smoothing == {"min_cutoff": 3.0, "beta": 20.0, "d_cutoff": 4.0}
+
+
+def test_toasts_default_on_and_round_trip(tmp_path, monkeypatch):
+    assert _load(tmp_path, monkeypatch, {"fps": 30.0}).toasts is True
+    monkeypatch.setattr(config, "SUPPORT_DIR", tmp_path)
+    config.save_config(config.Config(toasts=False))
+    assert config.load_config().toasts is False
