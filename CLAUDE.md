@@ -31,24 +31,9 @@ pgrep and its parent is launchd, not a shell.
 
 ## Architecture in one paragraph
 
-Data flows one way. `capture/` opens the camera (OpenCV) and runs MediaPipe's
-GestureRecognizer, emitting a `Frame` (hands with landmarks, handedness, pose
-label). `engine/` runs every registered gesture against each hand (or pair)
-and emits `gesture` events (engage, hold, release, flick) and `delta` events
-(x, y, angle, scale from the engage origin, user space). `mapping/` applies
-those to bindings from a JSON document and hands `Action` objects to a
-`Performer`. `output/` is the Mac performer (CGEvent via PyObjC). `app/`
-is the rumps menu bar, the config files, and the capture thread that ties
-the layers together. `ui/` is the HUD: an aiohttp server (static page, JSON
-API for mappings and thresholds, websocket stream of frames and events) and
-the WebKit window the menu opens it in. The page itself is TypeScript in
-ui/web/, built into ui/static/, laid out like BetterTouchTool: bindings.ts
-is the list of every binding plus the selected one's detail pane, live.ts
-is the readout beside the video (hands in view, non-idle gestures with
-score bars; nothing is drawn as text on the camera canvas), hud.ts draws
-the mirrored frame and skeleton, keys.ts records a chord from the
-keyboard. The video and readout stream only while the page is open. Each package's `__init__.py` docstring says what it
-owns; the top-level `gesture_mac/__init__.py` lists the import order.
+Each package's `__init__.py` docstring says what it owns, and each
+`ui/web/src` file opens with what it does. The top-level
+`gesture_mac/__init__.py` lists the import order.
 
 ## Rules that keep it clean
 
